@@ -10,3 +10,5 @@ export {
   type Diagnostic,
   type DiagnosticCode,
 } from "./diagnostics.js";
+export { KEYWORDS, type Token, type TokenKind } from "./lexer.js";
+export { tokenize } from "./api.js";
