@@ -1,0 +1,8 @@
+error[T0306]: `safety` applies only to bool inputs, but `conveyor` is an output
+  --> tests/fixtures/errors/T0306_safety_on_output.tejun:11:52
+   |
+11 |     output conveyor     : bool     @ %QX0.2 "コンベア" safety
+   |                                                        ^^^^^^ not allowed here
+   |
+   = help: mark E-stop and guard-door inputs as `safety`; outputs are made safe by `outputs safe` in handlers
+   = 日本語: `safety` は bool 型の入力にのみ指定できますが、`conveyor` は出力です

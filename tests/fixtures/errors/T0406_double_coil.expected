@@ -1,0 +1,8 @@
+error[T0406]: `clamp_out` is driven by device `clamp`; switching it directly drives it from two places (double coil)
+  --> tests/fixtures/errors/T0406_double_coil.tejun:19:21
+   |
+19 |     state Clamp   { clamp_out on; clamp.extend within 2 s else fault CLAMP_TIMEOUT; -> Press }
+   |                     ^^^^^^^^^ driven by `clamp`
+   |
+   = help: use `clamp.extend within … else fault …` instead
+   = 日本語: `clamp_out` はデバイス `clamp` が駆動しています。直接ONにすると2か所から駆動されます (二重コイル)

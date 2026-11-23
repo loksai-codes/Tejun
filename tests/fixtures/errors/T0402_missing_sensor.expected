@@ -1,0 +1,8 @@
+error[T0402]: device `clamp` is missing parameter `at_ret`
+  --> tests/fixtures/errors/T0402_missing_sensor.tejun:13:10
+   |
+13 |   device clamp : Cylinder(extend: clamp_out, retract: clamp_in,
+   |          ^^^^^ missing `at_ret`
+   |
+   = help: `at_ret` is the sensor that confirms the cylinder is retracted; without it Tejun cannot confirm that a move finished
+   = 日本語: デバイス `clamp` にパラメータ `at_ret` がありません

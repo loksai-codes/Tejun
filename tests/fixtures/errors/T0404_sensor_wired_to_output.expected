@@ -1,0 +1,8 @@
+error[T0404]: parameter `at_ext` needs a bool input, but `conveyor` is an output
+  --> tests/fixtures/errors/T0404_sensor_wired_to_output.tejun:14:35
+   |
+14 |                           at_ext: conveyor, at_ret: clamp_ret_ls)
+   |                                   ^^^^^^^^ expected a bool input
+   |
+   = help: `at_ext` is the sensor that confirms the cylinder is extended
+   = 日本語: パラメータ `at_ext` には bool 型の入力が必要ですが、`conveyor` は出力です

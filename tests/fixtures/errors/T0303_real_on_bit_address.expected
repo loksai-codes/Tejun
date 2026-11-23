@@ -1,0 +1,8 @@
+error[T0303]: real signal `press_force` is on a bit address `%IX1.0`
+ --> tests/fixtures/errors/T0303_real_on_bit_address.tejun:8:38
+  |
+8 |     input  press_force  : real<kN> @ %IX1.0 "プレス荷重" range 0..50
+  |                                      ^^^^^^ bit address
+  |
+  = help: bool signals use bit addresses like %IX0.0; real signals use word addresses like %IW2
+  = 日本語: real 型の信号 `press_force` がビットアドレス `%IX1.0` に割り当てられています

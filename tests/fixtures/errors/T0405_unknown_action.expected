@@ -1,0 +1,8 @@
+error[T0405]: Cylinder has no action `extnd`
+  --> tests/fixtures/errors/T0405_unknown_action.tejun:19:27
+   |
+19 |     state Clamp   { clamp.extnd within 2 s else fault CLAMP_TIMEOUT; -> Press }
+   |                           ^^^^^ unknown action
+   |
+   = help: did you mean `extend`?
+   = 日本語: Cylinder に動作 `extnd` はありません

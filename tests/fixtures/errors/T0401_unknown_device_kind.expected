@@ -1,0 +1,8 @@
+error[T0401]: unknown device kind `Cilinder`
+  --> tests/fixtures/errors/T0401_unknown_device_kind.tejun:13:18
+   |
+13 |   device clamp : Cilinder(extend: clamp_out, retract: clamp_in,
+   |                  ^^^^^^^^ unknown device kind
+   |
+   = help: did you mean `Cylinder`?
+   = 日本語: 不明なデバイス種別 `Cilinder`

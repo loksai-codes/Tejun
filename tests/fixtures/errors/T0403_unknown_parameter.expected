@@ -1,0 +1,8 @@
+error[T0403]: Cylinder has no parameter `at_extnd`
+  --> tests/fixtures/errors/T0403_unknown_parameter.tejun:14:27
+   |
+14 |                           at_extnd: clamp_ext_ls, at_ret: clamp_ret_ls)
+   |                           ^^^^^^^^ unknown parameter
+   |
+   = help: did you mean `at_ext`?
+   = 日本語: Cylinder にパラメータ `at_extnd` はありません

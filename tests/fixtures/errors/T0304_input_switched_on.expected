@@ -1,0 +1,8 @@
+error[T0304]: `part_present` is an input and cannot be switched on
+  --> tests/fixtures/errors/T0304_input_switched_on.tejun:18:21
+   |
+18 |     state Idle    { part_present on; when part_present forever -> Clamp }
+   |                     ^^^^^^^^^^^^ input
+   |
+   = help: only outputs can be switched on; inputs are read from sensors
+   = 日本語: `part_present` は入力のためONにできません

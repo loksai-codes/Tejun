@@ -6,6 +6,8 @@ import type { Program } from "../ast.js";
 import type { Diagnostic } from "../diagnostics.js";
 import type { SourceFile } from "../source.js";
 import { CheckContext } from "./context.js";
+import { checkDevices } from "./devices.js";
+import { checkIo } from "./io.js";
 import { checkNames } from "./names.js";
 import { checkTypes } from "./types.js";
 import { checkUnits } from "./units.js";
@@ -15,6 +17,8 @@ export function runChecker(source: SourceFile, program: Program): Diagnostic[] {
   checkNames(ctx);
   checkUnits(ctx); // before types: marks signals whose unit is unknown
   checkTypes(ctx);
+  checkIo(ctx);
+  checkDevices(ctx);
   return sortDiagnostics(ctx.diagnostics);
 }
 

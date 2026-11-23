@@ -1,0 +1,25 @@
+// T0301: two signals on the same address.
+station Demo "デモ" {
+  io {
+    input  part_present : bool     @ %IX0.0 "ワーク検出"
+    input  clamp_ext_ls : bool     @ %IX0.1 "クランプ前進端"
+    input  clamp_ret_ls : bool     @ %IX0.2 "クランプ後退端"
+    input  estop_ok     : bool     @ %IX0.7 "非常停止OK" safety
+    input  press_force  : real<kN> @ %IW2   "プレス荷重" range 0..50
+    output clamp_out    : bool     @ %QX0.0 "クランプ前進"
+    output clamp_in     : bool     @ %QX0.1 "クランプ後退"
+    output conveyor     : bool     @ %QX0.1 "コンベア"
+  }
+  device clamp : Cylinder(extend: clamp_out, retract: clamp_in,
+                          at_ext: clamp_ext_ls, at_ret: clamp_ret_ls)
+  interlock conveyor requires clamp.retracted
+  interlock press_force < 40 kN else fault OVERLOAD
+  sequence main {
+    state Idle    { conveyor on; when part_present forever -> Clamp }
+    state Clamp   { clamp.extend within 2 s else fault CLAMP_TIMEOUT; -> Press }
+    state Press   { hold 1500 ms; -> Release }
+    state Release { clamp.retract within 2 s else fault RELEASE_TIMEOUT; -> Idle }
+  }
+  on fault        { outputs safe; -> Stopped }
+  on not estop_ok { outputs safe; -> Stopped }
+}

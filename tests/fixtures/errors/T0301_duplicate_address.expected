@@ -1,0 +1,8 @@
+error[T0301]: address `%QX0.1` is already used by `clamp_in`
+  --> tests/fixtures/errors/T0301_duplicate_address.tejun:11:38
+   |
+11 |     output conveyor     : bool     @ %QX0.1 "コンベア"
+   |                                      ^^^^^^ used twice
+   |
+   = help: `clamp_in` is declared on line 10; give each signal its own address
+   = 日本語: アドレス `%QX0.1` はすでに `clamp_in` が使用しています

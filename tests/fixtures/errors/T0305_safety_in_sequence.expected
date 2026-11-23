@@ -1,0 +1,8 @@
+error[T0305]: safety signal `estop_ok` is used in sequence logic
+  --> tests/fixtures/errors/T0305_safety_in_sequence.tejun:18:56
+   |
+18 |     state Idle    { conveyor on; when part_present and estop_ok forever -> Clamp }
+   |                                                        ^^^^^^^^ safety signal
+   |
+   = help: keep the stop path independent of the sequence: handle it in `on not estop_ok { outputs safe; -> Stopped }`
+   = 日本語: 安全信号 `estop_ok` がシーケンスのロジックで使われています

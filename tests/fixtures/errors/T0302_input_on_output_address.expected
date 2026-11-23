@@ -1,0 +1,8 @@
+error[T0302]: input `part_present` is on output address `%QX0.3`
+ --> tests/fixtures/errors/T0302_input_on_output_address.tejun:4:38
+  |
+4 |     input  part_present : bool     @ %QX0.3 "ワーク検出"
+  |                                      ^^^^^^ output address
+  |
+  = help: inputs use %I addresses and outputs use %Q addresses
+  = 日本語: 入力 `part_present` が出力アドレス `%QX0.3` に割り当てられています
