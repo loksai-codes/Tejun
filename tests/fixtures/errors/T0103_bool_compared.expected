@@ -1,0 +1,8 @@
+error[T0103]: `<` compares numbers, but `part_present` is bool
+  --> tests/fixtures/errors/T0103_bool_compared.tejun:16:13
+   |
+16 |   interlock part_present < 40 kN else fault OVERLOAD
+   |             ^^^^^^^^^^^^^^^^^^^^ bool in a numeric comparison
+   |
+   = help: use a bool signal directly as a condition: `part_present` or `not part_present`
+   = 日本語: `<` は数値を比較しますが、`part_present` は bool です

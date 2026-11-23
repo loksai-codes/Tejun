@@ -7,10 +7,14 @@ import type { Diagnostic } from "../diagnostics.js";
 import type { SourceFile } from "../source.js";
 import { CheckContext } from "./context.js";
 import { checkNames } from "./names.js";
+import { checkTypes } from "./types.js";
+import { checkUnits } from "./units.js";
 
 export function runChecker(source: SourceFile, program: Program): Diagnostic[] {
   const ctx = new CheckContext(source, program);
   checkNames(ctx);
+  checkUnits(ctx); // before types: marks signals whose unit is unknown
+  checkTypes(ctx);
   return sortDiagnostics(ctx.diagnostics);
 }
 

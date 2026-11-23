@@ -1,0 +1,8 @@
+error[T0104]: cannot compare `press_force` (kN) with `40 N` (N)
+  --> tests/fixtures/errors/T0104_unit_mismatch.tejun:16:27
+   |
+16 |   interlock press_force < 40 N else fault OVERLOAD
+   |                           ^^^^ unit mismatch
+   |
+   = help: Tejun does not convert units; write `0.04 kN`
+   = 日本語: 単位が一致しません: `press_force` (kN) と `40 N` (N)

@@ -1,0 +1,8 @@
+error[T0104]: `40` has no unit, but `press_force` is in kN
+  --> tests/fixtures/errors/T0104_missing_unit.tejun:16:27
+   |
+16 |   interlock press_force < 40 else fault OVERLOAD
+   |                           ^^ missing unit
+   |
+   = help: write `40 kN`
+   = 日本語: `40` に単位がありませんが、`press_force` は kN です

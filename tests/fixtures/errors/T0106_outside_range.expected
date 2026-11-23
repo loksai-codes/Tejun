@@ -1,0 +1,8 @@
+error[T0106]: `press_force < 60 kN` is always true: `press_force` is declared as 0..50 kN
+  --> tests/fixtures/errors/T0106_outside_range.tejun:16:27
+   |
+16 |   interlock press_force < 60 kN else fault OVERLOAD
+   |                           ^^^^^ outside 0..50
+   |
+   = help: check the limit; a comparison that never changes protects nothing
+   = 日本語: `press_force < 60 kN` は常に真です: `press_force` の範囲は 0..50 kN です

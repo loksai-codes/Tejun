@@ -1,0 +1,8 @@
+error[T0105]: unknown unit `msec`
+  --> tests/fixtures/errors/T0105_unknown_unit.tejun:20:31
+   |
+20 |     state Press   { hold 1500 msec; -> Release }
+   |                               ^^^^ unknown unit
+   |
+   = help: did you mean `ms`?
+   = 日本語: 不明な単位 `msec`

@@ -1,0 +1,8 @@
+error[T0103]: a condition must be true or false, but `press_force` is real<kN>
+  --> tests/fixtures/errors/T0103_real_as_condition.tejun:18:39
+   |
+18 |     state Idle    { conveyor on; when press_force forever -> Clamp }
+   |                                       ^^^^^^^^^^^ not true/false
+   |
+   = help: compare it with a limit, e.g. `press_force > 0 kN`
+   = 日本語: 条件は真偽値である必要がありますが、`press_force` は real<kN> です
