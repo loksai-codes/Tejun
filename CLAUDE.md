@@ -1,7 +1,7 @@
 # Tejun (手順) — project guide for Claude Code
 
 ## Current state (as of 2026-11-23)
-Phase 5 done (`BUILD_PROMPTS.md` has the phase plan).
+Phase 6 done in code (`BUILD_PROMPTS.md` has the phase plan).
 - Phase 1: npm-workspaces monorepo, strict TypeScript, Vitest, GitHub Actions CI;
   `examples/` (press_feeder, conveyor_sorter, pick_place); `docs/grammar.ebnf`.
 - Phase 2: lexer, parser, AST, diagnostics; syntax codes T0001–T0016; `tejun check <file>`.
@@ -17,7 +17,14 @@ Phase 5 done (`BUILD_PROMPTS.md` has the phase plan).
 - Phase 5: `packages/runtime` (IR interpreter, simulated machine, scenarios, timeline);
   `tejun run`; each example has a `.scenario`; equivalence test proves the simulator
   matches the generated ST scan by scan.
-- Next: Phase 6 (web playground: Monaco editor, live diagnostics, SVG simulator).
+- Phase 6: `packages/playground` (Vite + React + Monaco): live diagnostics, generic SVG
+  station view, live simulator with jams, event log, ST and scenario tabs, EN/日本語.
+  `.github/workflows/pages.yml` deploys it to GitHub Pages on push to `main`.
+- Not yet live: the Pages site (needs a GitHub remote with Pages set to "GitHub Actions").
+- Known: `monaco-editor` pins DOMPurify 3.4.15, which `npm audit` flags as low severity
+  (IN_PLACE / SAFE_FOR_TEMPLATES modes; Monaco only renders our own hover text). Revisit
+  when Monaco ships a newer DOMPurify; don't force an override.
+- Next: Phase 7 (docs, README, optional AI front end, polish).
 - Not added yet: `docs/SPEC.md` (work from this file until it exists). No GitHub remote yet.
 Update this section as phases are completed.
 
@@ -138,7 +145,17 @@ grammar, `docs/language-reference.md`, and the examples in the same change.
     returns events and a per-scan trace
   - `timeline.ts` — the text timeline `tejun run` prints
 - `packages/cli/` — `tejun check | build | run`
-- `packages/playground/` — Monaco editor + 2D SVG simulator (later phase)
+- `packages/playground/` — Vite + React app, compiler and runtime used from source (aliases
+  in `vite.config.ts`), no server:
+  - `src/monaco.ts` — Monaco trimmed to the core editor + the features used (hover, error
+    navigation, find, brackets…) via the `monaco-esm/` alias to `monaco-editor/esm/vs`;
+    importing full `monaco-editor` would bundle 11 MB of unused language services
+  - `src/Editor.tsx` — Monaco wrapper; `src/StationView.tsx` — SVG view built from the IR
+    (works for any station); `src/App.tsx` — layout, live loop, controls, tabs
+  - `src/logic/` — browser-independent logic (markers, i18n, Monarch tokenizer, live clock),
+    unit-tested in `tests/playground.test.ts`
+  - Effects must use block bodies: newer browsers return a Promise from
+    `scrollIntoView`, and React treats a returned value as the cleanup function.
 
 The interpreter and ST codegen MUST read the same IR so the simulator behaves
 exactly like the generated PLC code.
@@ -216,7 +233,17 @@ How diagnostics work in code:
 - To try generated code in OpenPLC: `npx tejun build examples/press_feeder.tejun`, then
   upload `out/press_feeder.st` in OpenPLC Runtime (Programs → Upload Program). For
   CODESYS, copy only the FUNCTION_BLOCK.
-- Allowed runtime dependencies: none in compiler/runtime. Playground may use Monaco and React.
+- Allowed runtime dependencies: none in compiler/runtime. Playground: `react`, `react-dom`,
+  `monaco-editor`; dev: `vite`, `@vitejs/plugin-react`, `@types/react`, `@types/react-dom`
+  (all exact versions, in `packages/playground` only).
+- Playground: `npm run playground` (dev server, http://localhost:5173),
+  `npm run build:playground` (static site in `packages/playground/dist`). CI builds it.
+- Browser smoke test (no extra dependencies; uses installed Edge/Chrome headless):
+  build, run `npx vite preview --port 4173` in `packages/playground`, then
+  `node scripts/browser-smoke.mjs http://localhost:4173/ <screenshot-dir>`. It exits 1 if
+  a check fails or the page logs an error. Run it after any playground change.
+- Deploying: create the GitHub repo, push `main`, then Settings → Pages → Source:
+  "GitHub Actions". The site URL appears in the "Deploy playground" workflow run.
 - Ask before adding any dependency.
 
 ## Testing rules
