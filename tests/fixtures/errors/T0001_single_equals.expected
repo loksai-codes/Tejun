@@ -1,0 +1,8 @@
+error[T0001]: unexpected character `=`
+ --> tests/fixtures/errors/T0001_single_equals.tejun:9:29
+  |
+9 |   interlock never (conveyor = estop_ok)
+  |                             ^ not allowed here
+  |
+  = help: use `==` to compare
+  = 日本語: 予期しない文字 `=`

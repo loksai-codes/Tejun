@@ -1,0 +1,16 @@
+// T0015: a chained comparison.
+station Demo "デモ" {
+  io {
+    input  part_present : bool     @ %IX0.0 "ワーク検出"
+    input  estop_ok     : bool     @ %IX0.7 "非常停止OK" safety
+    input  press_force  : real<kN> @ %IW2   "プレス荷重" range 0..50
+    output conveyor     : bool     @ %QX0.0 "コンベア"
+  }
+  interlock never (conveyor and not estop_ok)
+  interlock 0 kN < press_force < 40 kN else fault OVERLOAD
+  sequence main {
+    state Idle { conveyor on; when part_present forever -> Run }
+    state Run  { hold 1 s; -> Idle }
+  }
+  on not estop_ok { outputs safe; -> Stopped }
+}

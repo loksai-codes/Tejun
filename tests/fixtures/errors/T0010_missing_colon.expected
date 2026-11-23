@@ -1,0 +1,8 @@
+error[T0010]: expected `:`, found keyword `bool`
+ --> tests/fixtures/errors/T0010_missing_colon.tejun:4:27
+  |
+4 |     input  part_present   bool     @ %IX0.0 "ワーク検出"
+  |                           ^^^^ expected `:`
+  |
+  = help: a signal is declared as `input <name> : <type> @ <address> ["label"]`
+  = 日本語: `:` が必要ですが、キーワード `bool` が見つかりました

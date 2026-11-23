@@ -1,0 +1,8 @@
+error[T0012]: unknown keyword `interlok`
+ --> tests/fixtures/errors/T0012_unknown_keyword.tejun:9:3
+  |
+9 |   interlok never (conveyor and not estop_ok)
+  |   ^^^^^^^^ unknown keyword
+  |
+  = help: did you mean `interlock`?
+  = 日本語: 不明なキーワード `interlok`

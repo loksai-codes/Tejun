@@ -1,0 +1,8 @@
+error[T0010]: expected `safe`, found name `off`
+  --> tests/fixtures/errors/T0010_handler_body.tejun:15:29
+   |
+15 |   on not estop_ok { outputs off; -> Stopped }
+   |                             ^^^ expected `safe`
+   |
+   = help: a handler body is `outputs safe; -> Stopped`
+   = 日本語: `safe` が必要ですが、名前 `off` が見つかりました

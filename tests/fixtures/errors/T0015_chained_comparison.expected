@@ -1,0 +1,8 @@
+error[T0015]: comparisons cannot be chained
+  --> tests/fixtures/errors/T0015_chained_comparison.tejun:10:13
+   |
+10 |   interlock 0 kN < press_force < 40 kN else fault OVERLOAD
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^ chained comparison
+   |
+   = help: compare each pair and join them with `and`, e.g. `0 < x and x < 40`
+   = 日本語: 比較演算子は連結できません

@@ -1,0 +1,8 @@
+error[T0001]: unexpected character `；`
+  --> tests/fixtures/errors/T0001_fullwidth_semicolon.tejun:12:29
+   |
+12 |     state Idle { conveyor on； when part_present forever -> Run }
+   |                             ^^ not allowed here
+   |
+   = help: this is a full-width `；`; use the ASCII `;`
+   = 日本語: 予期しない文字 `；`

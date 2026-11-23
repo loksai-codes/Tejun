@@ -1,0 +1,8 @@
+error[T0002]: unterminated string
+ --> tests/fixtures/errors/T0002_unterminated_string.tejun:4:45
+  |
+4 |     input  part_present : bool     @ %IX0.0 "ワーク検出
+  |                                             ^^^^^^^^^^^ this string is never closed
+  |
+  = help: add a closing `"` before the end of the line
+  = 日本語: 文字列が閉じられていません

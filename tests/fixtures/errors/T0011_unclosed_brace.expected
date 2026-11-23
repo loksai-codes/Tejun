@@ -1,0 +1,8 @@
+error[T0011]: unexpected end of file: `{` is never closed
+ --> tests/fixtures/errors/T0011_unclosed_brace.tejun:2:19
+  |
+2 | station Demo "デモ" {
+  |                     ^ this `{` is never closed
+  |
+  = help: add the matching `}`
+  = 日本語: ファイルが途中で終わっています: `{` が閉じられていません

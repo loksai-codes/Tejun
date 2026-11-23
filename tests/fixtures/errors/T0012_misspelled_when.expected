@@ -1,0 +1,8 @@
+error[T0012]: unknown keyword `wen`
+  --> tests/fixtures/errors/T0012_misspelled_when.tejun:12:31
+   |
+12 |     state Idle { conveyor on; wen part_present forever -> Run }
+   |                               ^^^ unknown keyword
+   |
+   = help: did you mean `when`?
+   = 日本語: 不明なキーワード `wen`

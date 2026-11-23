@@ -1,0 +1,8 @@
+error[T0014]: `interlock` must come before `sequence`
+  --> tests/fixtures/errors/T0014_section_order.tejun:14:3
+   |
+14 |   interlock press_force < 40 kN else fault OVERLOAD
+   |   ^^^^^^^^^ out of order
+   |
+   = help: sections go in this order: io, device, interlock, sequence, on
+   = 日本語: `interlock` は `sequence` より前に書く必要があります

@@ -1,0 +1,8 @@
+error[T0003]: malformed I/O address `%IX0.8`
+ --> tests/fixtures/errors/T0003_bit_out_of_range.tejun:5:38
+  |
+5 |     input  estop_ok     : bool     @ %IX0.8 "非常停止OK" safety
+  |                                      ^^^^^^ not a valid address
+  |
+  = help: the bit number must be 0..7; did you mean %IX1.0?
+  = 日本語: 不正なI/Oアドレス `%IX0.8`

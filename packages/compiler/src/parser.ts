@@ -22,6 +22,7 @@ const SECTION_HELP = "sections go in this order: io, device, interlock, sequence
 const STATEMENT_HELP =
   "a statement is one of: `<output> on`, `<device>.<action> within …`, `hold <time>`, `when <cond> … -> <State>`, `-> <State>`";
 const HANDLER_HELP = "a handler body is `outputs safe; -> Stopped`";
+const IO_HELP = 'a signal is declared as `input <name> : <type> @ <address> ["label"]`';
 const INTERLOCK_HELP =
   "an interlock is `never <cond>`, `<output> requires <cond>`, or `<cond> else fault <CODE>`";
 
@@ -192,9 +193,9 @@ export class Parser {
     this.next();
     const direction = t.text as "input" | "output";
     const name = this.expectIdent(phrase("a signal name", "信号名"));
-    this.expectSymbol(":");
+    this.expectSymbol(":", { help: IO_HELP });
     const type = this.parseType();
-    this.expectSymbol("@");
+    this.expectSymbol("@", { help: IO_HELP });
     const address = this.parseAddress();
     const label = this.peek().kind === "string" ? this.parseString() : undefined;
     const safety = this.isKeyword("safety") ? this.next().span : undefined;

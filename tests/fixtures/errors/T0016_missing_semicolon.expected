@@ -1,0 +1,8 @@
+error[T0016]: missing `;` between statements
+  --> tests/fixtures/errors/T0016_missing_semicolon.tejun:12:29
+   |
+12 |     state Idle { conveyor on when part_present forever -> Run }
+   |                             ^ expected `;` here
+   |
+   = help: separate statements in a state with `;`
+   = 日本語: 文の間に `;` がありません

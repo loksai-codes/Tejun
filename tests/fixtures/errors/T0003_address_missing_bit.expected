@@ -1,0 +1,8 @@
+error[T0003]: malformed I/O address `%QX9`
+ --> tests/fixtures/errors/T0003_address_missing_bit.tejun:7:38
+  |
+7 |     output conveyor     : bool     @ %QX9 "コンベア"
+  |                                      ^^^^ not a valid address
+  |
+  = help: a bit address needs a byte and a bit number, like %QX0.1
+  = 日本語: 不正なI/Oアドレス `%QX9`

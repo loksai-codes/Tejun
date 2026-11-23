@@ -1,0 +1,8 @@
+error[T0013]: `state` is a keyword and cannot be used as a name
+ --> tests/fixtures/errors/T0013_keyword_as_name.tejun:7:12
+  |
+7 |     output state        : bool     @ %QX0.0 "コンベア"
+  |            ^^^^^ expected a signal name
+  |
+  = help: choose another name, such as `state_1`
+  = 日本語: `state` はキーワードのため名前として使えません
