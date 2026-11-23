@@ -2,28 +2,33 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { runCli, type CliIo } from "@tejun/cli";
 
-/** In-memory files; a missing path fails like the real file system. */
-function memoryIo(files: Record<string, string>): CliIo {
+/** In-memory files. A missing path fails like the real file system; writes are recorded. */
+function memoryIo(files: Record<string, string>): CliIo & { written: Map<string, string>; dirs: string[] } {
+  const written = new Map<string, string>();
+  const dirs: string[] = [];
   return {
+    written,
+    dirs,
     readFile(path) {
       const text = files[path];
       if (text === undefined) throw Object.assign(new Error(`ENOENT: ${path}`), { code: "ENOENT" });
       return text;
     },
+    makeDir: (path) => void dirs.push(path),
+    writeFile: (path, text) => void written.set(path.replace(/\\/g, "/"), text),
   };
 }
 
 const example = (name: string) => readFileSync(new URL(`../examples/${name}`, import.meta.url), "utf8");
+const golden = (name: string) => readFileSync(new URL(`./golden/${name}`, import.meta.url), "utf8");
+const EXAMPLES = ["press_feeder.tejun", "conveyor_sorter.tejun", "pick_place.tejun"];
 
 describe("tejun check", () => {
-  it.each(["press_feeder.tejun", "conveyor_sorter.tejun", "pick_place.tejun"])(
-    "prints OK for examples/%s",
-    (name) => {
-      const path = `examples/${name}`;
-      const result = runCli(["check", path], memoryIo({ [path]: example(name) }));
-      expect(result).toEqual({ code: 0, stdout: "OK\n", stderr: "" });
-    },
-  );
+  it.each(EXAMPLES)("prints OK for examples/%s", (name) => {
+    const path = `examples/${name}`;
+    const result = runCli(["check", path], memoryIo({ [path]: example(name) }));
+    expect(result).toEqual({ code: 0, stdout: "OK\n", stderr: "" });
+  });
 
   it("prints diagnostics and exits 1 for a broken file", () => {
     const fixture = "tests/fixtures/errors/T0010_missing_colon.tejun";
@@ -52,18 +57,60 @@ describe("tejun check", () => {
     expect(runCli(["check", "a", "b"], memoryIo({ a: "" })).stderr).toContain("unexpected argument 'b'");
   });
 
-  it("reports an internal error without a stack trace", () => {
-    const io: CliIo = {
-      readFile: () => {
-        throw new TypeError("boom");
-      },
+  it("reports read errors and internal errors without a stack trace", () => {
+    const io = memoryIo({});
+    io.readFile = () => {
+      throw new TypeError("boom");
     };
-    // A non-ENOENT read error is a normal "cannot read" message...
     expect(runCli(["check", "x"], io).stderr).toContain("it could not be read");
-    // ...and an unexpected crash elsewhere is an internal error.
-    const crash = runCli(["check", "x"], { readFile: () => null as unknown as string });
+
+    io.readFile = () => null as unknown as string;
+    const crash = runCli(["check", "x"], io);
     expect(crash.code).toBe(2);
     expect(crash.stderr).toContain("internal error");
     expect(crash.stderr).not.toMatch(/\n\s+at /);
+  });
+});
+
+describe("tejun build", () => {
+  it.each(EXAMPLES)("writes out/<name>.st for examples/%s", (name) => {
+    const path = `examples/${name}`;
+    const io = memoryIo({ [path]: example(name) });
+    const stName = name.replace(".tejun", ".st");
+    const result = runCli(["build", path], io);
+    expect(result).toEqual({ code: 0, stdout: `wrote out/${stName}\n`, stderr: "" });
+    expect(io.dirs).toEqual(["out"]);
+    expect(io.written.get(`out/${stName}`)).toBe(golden(stName));
+  });
+
+  it("honours -o", () => {
+    const io = memoryIo({ "p.tejun": example("press_feeder.tejun") });
+    const result = runCli(["build", "p.tejun", "-o", "plc/gen"], io);
+    expect(result.stdout).toBe("wrote plc/gen/p.st\n");
+    expect([...io.written.keys()]).toEqual(["plc/gen/p.st"]);
+  });
+
+  it("writes nothing and exits 1 when the program has errors", () => {
+    const text = example("press_feeder.tejun").replace(/^\s*state Home.*\n/m, "");
+    const io = memoryIo({ "p.tejun": text });
+    const result = runCli(["build", "p.tejun"], io);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("error[T0203]");
+    expect(io.written.size).toBe(0);
+  });
+
+  it("exits 2 for bad arguments or an unwritable directory", () => {
+    const files = { "p.tejun": example("press_feeder.tejun") };
+    expect(runCli(["build"], memoryIo(files)).code).toBe(2);
+    expect(runCli(["build", "p.tejun", "-o"], memoryIo(files)).stderr).toContain("'-o' needs a directory");
+    expect(runCli(["build", "p.tejun", "--fast"], memoryIo(files)).stderr).toContain("unexpected argument '--fast'");
+
+    const io = memoryIo(files);
+    io.writeFile = () => {
+      throw new Error("EACCES");
+    };
+    const result = runCli(["build", "p.tejun"], io);
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain("cannot write 'out/p.st'");
   });
 });
