@@ -35,6 +35,7 @@ export const DIAGNOSTIC_CODES = {
   T0104: "unit mismatch",
   T0105: "unknown unit",
   T0106: "value outside the declared range",
+  T0107: "name not usable in Structured Text",
 
   T0201: "wait with no timeout",
   T0202: "unreachable state",

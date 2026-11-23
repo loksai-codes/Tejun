@@ -5,6 +5,7 @@ import type { Program } from "./ast.js";
 import { runChecker } from "./checker/index.js";
 import { checkInterlocks } from "./checker/interlocks.js";
 import { DiagnosticAbort, type Diagnostic } from "./diagnostics.js";
+import { generateST } from "./codegen/st.js";
 import { buildIR, type StationIR } from "./ir.js";
 import { lexAll, type Token } from "./lexer.js";
 import { Parser } from "./parser.js";
@@ -53,4 +54,16 @@ export function check(path: string, text: string): CheckResult {
   const violations = checkInterlocks(ir, parsed.program, source);
   if (violations.length > 0) return { source, program: parsed.program, diagnostics: violations };
   return { source, program: parsed.program, diagnostics, ir };
+}
+
+export interface BuildResult extends CheckResult {
+  /** Generated Structured Text; present only when the program checked clean. */
+  st?: string;
+}
+
+/** Check a program and, if it is clean, generate Structured Text. */
+export function build(path: string, text: string): BuildResult {
+  const result = check(path, text);
+  if (!result.ir) return result;
+  return { ...result, st: generateST(result.ir, { sourcePath: result.source.path }) };
 }

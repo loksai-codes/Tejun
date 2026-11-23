@@ -11,6 +11,7 @@ import { checkIo } from "./io.js";
 import { checkNames } from "./names.js";
 import { checkReachability } from "./reachability.js";
 import { checkStates } from "./states.js";
+import { checkTargetNames } from "./target.js";
 import { checkTimeouts } from "./timeouts.js";
 import { checkTypes } from "./types.js";
 import { checkUnits } from "./units.js";
@@ -18,6 +19,7 @@ import { checkUnits } from "./units.js";
 export function runChecker(source: SourceFile, program: Program): Diagnostic[] {
   const ctx = new CheckContext(source, program);
   checkNames(ctx);
+  checkTargetNames(ctx);
   checkUnits(ctx); // before types: marks signals whose unit is unknown
   checkTypes(ctx);
   checkIo(ctx);

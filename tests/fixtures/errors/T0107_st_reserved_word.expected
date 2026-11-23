@@ -1,0 +1,8 @@
+error[T0107]: `step` is a reserved word in Structured Text
+ --> tests/fixtures/errors/T0107_st_reserved_word.tejun:4:12
+  |
+4 |     input  step : bool     @ %IX0.0 "ワーク検出"
+  |            ^^^^ reserved in Structured Text
+  |
+  = help: the generated PLC code would not compile; rename it, e.g. `step_sig`
+  = 日本語: `step` は Structured Text の予約語です
