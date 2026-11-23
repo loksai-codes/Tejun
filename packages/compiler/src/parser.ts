@@ -5,6 +5,7 @@ import type * as A from "./ast.js";
 import { DiagnosticAbort, type Diagnostic, type DiagnosticCode } from "./diagnostics.js";
 import { Lexer, type Token } from "./lexer.js";
 import type { SourceFile, Span } from "./source.js";
+import { closest } from "./suggest.js";
 
 /** A phrase for messages, in English and Japanese. */
 interface Phrase {
@@ -358,7 +359,7 @@ export class Parser {
   private failAfterStatement(stateName: A.Ident): never {
     const t = this.peek();
     if (t.kind === "ident") {
-      const suggestion = closestKeyword(t.text, STATEMENT_KEYWORDS);
+      const suggestion = closest(t.text, STATEMENT_KEYWORDS);
       if (suggestion) throw this.unknownKeyword(t, suggestion);
     }
     const startsStatement =
@@ -408,7 +409,7 @@ export class Parser {
           span: this.spanFrom(device.span, this.lastSpan()),
         };
       }
-      const suggestion = closestKeyword(t.text, ["when", "hold"]);
+      const suggestion = closest(t.text, ["when", "hold"]);
       if (suggestion) throw this.unknownKeyword(t, suggestion);
       this.next();
       return this.fail([tok("on"), tok(".")], { help: STATEMENT_HELP });
@@ -628,7 +629,7 @@ export class Parser {
     }
 
     if (t.kind === "ident" && options.keywords) {
-      const suggestion = closestKeyword(t.text, options.keywords);
+      const suggestion = closest(t.text, options.keywords);
       if (suggestion || options.keywordOnly) throw this.unknownKeyword(t, suggestion, expected);
     }
 
@@ -689,32 +690,4 @@ function joinPhrases(items: readonly Phrase[]): Phrase {
     `${en.slice(0, -1).join(", ")} or ${en[en.length - 1]}`,
     `${ja.slice(0, -1).join("、")} または ${ja[ja.length - 1]}`,
   );
-}
-
-/** The closest keyword within a small edit distance, for "did you mean". */
-function closestKeyword(word: string, candidates: readonly string[]): string | undefined {
-  const limit = word.length <= 3 ? 1 : 2;
-  let best: string | undefined;
-  let bestDistance = limit + 1;
-  for (const c of candidates) {
-    const d = editDistance(word, c);
-    if (d > 0 && d < bestDistance) {
-      best = c;
-      bestDistance = d;
-    }
-  }
-  return best;
-}
-
-function editDistance(a: string, b: string): number {
-  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i++) {
-    const row = [i];
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      row.push(Math.min(prev[j]! + 1, row[j - 1]! + 1, prev[j - 1]! + cost));
-    }
-    prev = row;
-  }
-  return prev[b.length]!;
 }

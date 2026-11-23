@@ -2,6 +2,7 @@
 // throws for problems in the user's program.
 
 import type { Program } from "./ast.js";
+import { runChecker } from "./checker/index.js";
 import { DiagnosticAbort, type Diagnostic } from "./diagnostics.js";
 import { lexAll, type Token } from "./lexer.js";
 import { Parser } from "./parser.js";
@@ -37,11 +38,10 @@ export interface CheckResult extends ParseResult {
   source: SourceFile;
 }
 
-/**
- * Check a program: everything `tejun check` does. For now this is parsing;
- * the checker passes are added in Phase 3.
- */
+/** Check a program: everything `tejun check` does. Parse, then run the checker. */
 export function check(path: string, text: string): CheckResult {
   const source = new SourceFile(path, text);
-  return { source, ...parse(source) };
+  const parsed = parse(source);
+  if (!parsed.program) return { source, ...parsed };
+  return { source, program: parsed.program, diagnostics: runChecker(source, parsed.program) };
 }

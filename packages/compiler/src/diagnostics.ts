@@ -28,6 +28,37 @@ export const DIAGNOSTIC_CODES = {
   T0014: "section out of order or repeated",
   T0015: "chained comparison",
   T0016: "missing `;` between statements",
+
+  T0101: "undefined name",
+  T0102: "duplicate name",
+  T0103: "type mismatch",
+  T0104: "unit mismatch",
+  T0105: "unknown unit",
+  T0106: "value outside the declared range",
+
+  T0201: "wait with no timeout",
+  T0202: "unreachable state",
+  T0203: "interlock violated",
+  T0204: "fault with no `on fault` handler",
+  T0205: "no E-stop handler",
+  T0206: "dead-end state",
+  T0207: "statement after a transition",
+  T0208: "more than one step in a state",
+  T0209: "handler does not go to `Stopped`",
+
+  T0301: "two signals on one address",
+  T0302: "address does not match the signal direction",
+  T0303: "address does not match the signal type",
+  T0304: "input used as an output",
+  T0305: "safety signal used in sequence logic",
+  T0306: "`safety` on a signal that cannot be a safety input",
+
+  T0401: "unknown device kind",
+  T0402: "missing device parameter",
+  T0403: "unknown or repeated device parameter",
+  T0404: "device parameter wired to the wrong kind of signal",
+  T0405: "unknown device action or state",
+  T0406: "output driven from two places",
 } as const;
 
 export type DiagnosticCode = keyof typeof DIAGNOSTIC_CODES;

@@ -1,0 +1,8 @@
+error[T0101]: undefined state `Pres`
+  --> tests/fixtures/errors/T0101_undefined_state.tejun:19:74
+   |
+19 |     state Clamp   { clamp.extend within 2 s else fault CLAMP_TIMEOUT; -> Pres }
+   |                                                                          ^^^^ no such state
+   |
+   = help: did you mean `Press`?
+   = 日本語: 未定義の状態 `Pres`

@@ -1,0 +1,8 @@
+error[T0102]: the name `part_present` is already declared
+  --> tests/fixtures/errors/T0102_duplicate_signal.tejun:11:12
+   |
+11 |     input  part_present : bool     @ %IX0.3 "予備"
+   |            ^^^^^^^^^^^^ declared again here
+   |
+   = help: the first declaration is on line 4; rename one of them
+   = 日本語: 名前 `part_present` はすでに宣言されています

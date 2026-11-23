@@ -1,0 +1,8 @@
+error[T0101]: undefined name `part_presnt`
+  --> tests/fixtures/errors/T0101_undefined_signal.tejun:18:39
+   |
+18 |     state Idle    { conveyor on; when part_presnt forever -> Clamp }
+   |                                       ^^^^^^^^^^^ not declared
+   |
+   = help: did you mean `part_present`?
+   = 日本語: 未定義の名前 `part_presnt`

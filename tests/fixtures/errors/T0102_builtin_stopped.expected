@@ -1,0 +1,8 @@
+error[T0102]: `Stopped` is a built-in state and cannot be declared
+  --> tests/fixtures/errors/T0102_builtin_stopped.tejun:22:11
+   |
+22 |     state Stopped { -> Idle }
+   |           ^^^^^^^ built-in state
+   |
+   = help: handlers go to `Stopped` automatically; choose another name for this state
+   = 日本語: `Stopped` は組み込みの状態のため宣言できません

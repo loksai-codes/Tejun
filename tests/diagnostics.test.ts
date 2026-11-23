@@ -14,7 +14,7 @@ const dir = new URL("./fixtures/errors/", import.meta.url);
 const fixtures = readdirSync(dir).filter((f) => f.endsWith(".tejun")).sort();
 const update = process.env.UPDATE_GOLDEN === "1";
 
-describe("syntax error fixtures", () => {
+describe("diagnostic fixtures", () => {
   it.each(fixtures)("%s", (file) => {
     const text = readFileSync(new URL(file, dir), "utf8");
     const result = check(`tests/fixtures/errors/${file}`, text);
