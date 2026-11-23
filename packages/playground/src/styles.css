@@ -304,8 +304,14 @@ select:focus-visible,
   color: var(--error);
 }
 
+/* On narrow screens the picture keeps a readable size and scrolls inside its card. */
+.station-scroll {
+  overflow-x: auto;
+}
+
 .station-svg {
   width: 100%;
+  min-width: 560px;
   height: auto;
   display: block;
 }

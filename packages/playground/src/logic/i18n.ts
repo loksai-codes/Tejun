@@ -42,7 +42,7 @@ const STRINGS = {
   faultLabel: { en: "Fault", ja: "故障" },
   none: { en: "none", ja: "なし" },
   time: { en: "Time", ja: "時間" },
-  driven: { en: "driven by", ja: "駆動:" },
+  follows: { en: "follows", ja: "追従:" },
   noEvents: { en: "Press Run to start the simulation.", ja: "「実行」を押すとシミュレーションが始まります。" },
   scenarioErrors: { en: "Scenario errors", ja: "シナリオのエラー" },
   scenarioHelp: {

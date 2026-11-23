@@ -20,6 +20,8 @@ export default defineConfig({
       "monaco-esm": monacoEsm,
     },
   },
+  // Monaco's internals are already ES modules; pre-bundling them breaks the worker import.
+  optimizeDeps: { exclude: ["monaco-esm"] },
   // The example programs live in the repo's examples/ folder.
   server: { fs: { allow: [repoRoot] } },
   build: { outDir: "dist", chunkSizeWarningLimit: 4000 },
