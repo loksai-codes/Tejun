@@ -7,7 +7,8 @@
   "workspaces": [
     "packages/compiler",
     "packages/runtime",
-    "packages/cli"
+    "packages/cli",
+    "packages/playground"
   ],
   "engines": {
     "node": ">=22"
@@ -15,9 +16,11 @@
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
-    "typecheck": "tsc -b && tsc -p tests --noEmit",
+    "typecheck": "tsc -b && tsc -p tests --noEmit && tsc -p packages/playground --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "playground": "npm run dev -w @tejun/playground",
+    "build:playground": "npm run build -w @tejun/playground"
   },
   "devDependencies": {
     "@tejun/cli": "0.0.0",

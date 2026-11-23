@@ -36,7 +36,12 @@ export function formatTimeline(ir: StationIR, result: SimulationResult, header: 
   return lines.join("\n") + "\n";
 }
 
-function describe(event: TimelineEvent, units: Map<string, string | undefined>): string {
+/** One event as timeline text, e.g. `Idle -> Clamp    outputs: clamp_out`. */
+export function describeEvent(event: TimelineEvent, units: ReadonlyMap<string, string | undefined>): string {
+  return describe(event, units);
+}
+
+function describe(event: TimelineEvent, units: ReadonlyMap<string, string | undefined>): string {
   switch (event.kind) {
     case "start":
       return withOutputs(`start in ${event.state}`, event.outputs);
