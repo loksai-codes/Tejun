@@ -1,0 +1,33 @@
+PickPlace ピック&プレース · scenario examples/pick_place.scenario · scan 20 ms
+   time  event
+  0.000  start in Wait                      outputs: all OFF
+  0.000  z_up_ls ON (z)
+  0.000  x_home_ls ON (x)
+  0.000  estop_ok ON (default)
+  0.500  part_ready ON (scenario)
+  0.500  Wait -> Pick                       outputs: z_down
+  0.520  z_up_ls OFF (z)
+  0.800  z_down_ls ON (z)
+  0.820  Pick -> Grip                       outputs: vacuum
+  0.920  vacuum_ok ON (follows vacuum)
+  0.920  Grip -> Lift                       outputs: z_up, vacuum
+  0.940  z_down_ls OFF (z)
+  1.000  part_ready OFF (scenario)
+  1.220  z_up_ls ON (z)
+  1.240  Lift -> Carry                      outputs: x_out, vacuum
+  1.260  x_home_ls OFF (x)
+  1.540  x_out_ls ON (x)
+  1.560  Carry -> Place                     outputs: z_down, vacuum
+  1.580  z_up_ls OFF (z)
+  1.860  z_down_ls ON (z)
+  1.880  Place -> Drop                      outputs: all OFF
+  1.980  vacuum_ok OFF (follows vacuum)
+  1.980  Drop -> Rise                       outputs: z_up
+  2.000  z_down_ls OFF (z)
+  2.280  z_up_ls ON (z)
+  2.300  Rise -> Return                     outputs: x_home
+  2.320  x_out_ls OFF (x)
+  2.600  x_home_ls ON (x)
+  2.620  Return -> Wait                     outputs: all OFF
+end at 6.000 s: Wait (time limit)
+終了 6.000 秒: Wait (時間制限)

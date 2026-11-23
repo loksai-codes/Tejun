@@ -1,0 +1,15 @@
+PressFeeder プレス送り · scenario examples/press_feeder.scenario · scan 20 ms · jammed: clamp_ext_ls (stuck OFF)
+   time  event
+  0.000  start in Home                      outputs: clamp_in
+  0.000  clamp_ret_ls ON (clamp)
+  0.000  estop_ok ON (default)
+  0.020  Home -> Idle                       outputs: conveyor
+  1.000  part_present ON (scenario)
+  1.000  Idle -> Clamp                      outputs: clamp_out
+  1.020  clamp_ret_ls OFF (clamp)
+  1.500  part_present OFF (scenario)
+  2.000  press_force = 12 kN (scenario)
+  3.020  FAULT 3 CLAMP_TIMEOUT: clamp_ext_ls not ON within 2000 ms
+  3.020  Clamp -> Stopped                   outputs: all OFF
+end at 3.020 s: Stopped, fault CLAMP_TIMEOUT
+終了 3.020 秒: Stopped、故障 CLAMP_TIMEOUT

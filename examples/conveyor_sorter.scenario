@@ -1,0 +1,10 @@
+# Conveyor sorter: a metal part is pushed off, then a plain part rides to the exit.
+at 1 s     part_at_gate = on
+at 1 s     metal_sensor = on
+at 1.1 s   part_at_gate = off
+at 1.1 s   metal_sensor = off
+at 3 s     part_at_gate = on
+at 3.1 s   part_at_gate = off
+at 4 s     exit_eye = on
+at 4.1 s   exit_eye = off
+until 6 s

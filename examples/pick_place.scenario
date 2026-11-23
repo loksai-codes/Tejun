@@ -1,0 +1,5 @@
+# Pick and place: one part. The vacuum sensor confirms 100 ms after the vacuum switches.
+follow vacuum_ok = vacuum after 100 ms
+at 0.5 s   part_ready = on
+at 1 s     part_ready = off
+until 6 s

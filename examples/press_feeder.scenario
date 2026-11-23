@@ -1,0 +1,7 @@
+# Press feeder: two parts arrive. The clamp is simulated; press force stays low.
+at 1 s     part_present = on
+at 1.5 s   part_present = off
+at 2 s     press_force = 12 kN
+at 6 s     part_present = on
+at 6.5 s   part_present = off
+until 10 s

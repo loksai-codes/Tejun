@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { runCli, type CliIo } from "@tejun/cli";
 
@@ -112,5 +112,75 @@ describe("tejun build", () => {
     const result = runCli(["build", "p.tejun"], io);
     expect(result.code).toBe(2);
     expect(result.stderr).toContain("cannot write 'out/p.st'");
+  });
+});
+
+describe("tejun run", () => {
+  /** Example program plus its scenario, as files in memory. */
+  const withScenario = (name: string) => {
+    const base = name.replace(".tejun", "");
+    return memoryIo({
+      [`examples/${name}`]: example(name),
+      [`examples/${base}.scenario`]: example(`${base}.scenario`),
+    });
+  };
+
+  /** Compare with a golden timeline, or write it when UPDATE_GOLDEN=1. */
+  const expectGolden = (actual: string, file: string) => {
+    const url = new URL(`./golden/${file}`, import.meta.url);
+    if (process.env.UPDATE_GOLDEN === "1") writeFileSync(url, actual, "utf8");
+    expect(actual).toBe(readFileSync(url, "utf8").replace(/\r\n/g, "\n"));
+  };
+
+  it.each(EXAMPLES)("prints the timeline for examples/%s with its scenario", (name) => {
+    const result = runCli(["run", `examples/${name}`], withScenario(name));
+    expect(result.code).toBe(0);
+    expectGolden(result.stdout, name.replace(".tejun", ".timeline.txt"));
+  });
+
+  it("shows a jammed sensor causing a timeout fault and all outputs going OFF", () => {
+    const result = runCli(["run", "examples/press_feeder.tejun", "--jam", "clamp_ext_ls"], withScenario("press_feeder.tejun"));
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("FAULT 3 CLAMP_TIMEOUT: clamp_ext_ls not ON within 2000 ms");
+    expect(result.stdout).toContain("Clamp -> Stopped                   outputs: all OFF");
+    expectGolden(result.stdout, "press_feeder.jam_clamp_ext_ls.timeline.txt");
+  });
+
+  it("runs without a scenario when none exists next to the program", () => {
+    const io = memoryIo({ "p.tejun": example("press_feeder.tejun") });
+    const result = runCli(["run", "p.tejun", "--until", "1s"], io);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("scenario none");
+    expect(result.stdout).toContain("end at 1.000 s: Idle (time limit)");
+  });
+
+  it("reports an E-stop as the reason for stopping", () => {
+    const io = memoryIo({ "p.tejun": example("press_feeder.tejun"), "s.scenario": "at 1 s estop_ok = off" });
+    const result = runCli(["run", "p.tejun", "--scenario", "s.scenario"], io);
+    expect(result.stdout).toContain("1.000  Idle -> Stopped (E-stop: not estop_ok) outputs: all OFF");
+  });
+
+  it("prints scenario errors and exits 1", () => {
+    const io = memoryIo({ "p.tejun": example("press_feeder.tejun"), "p.scenario": "at 1 s part_presnt = on" });
+    const result = runCli(["run", "p.tejun"], io);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("error: p.scenario:1: unknown input `part_presnt`");
+  });
+
+  it("prints program errors and exits 1", () => {
+    const io = memoryIo({ "p.tejun": "station" });
+    expect(runCli(["run", "p.tejun"], io).code).toBe(1);
+  });
+
+  it("exits 2 for bad options", () => {
+    const io = withScenario("press_feeder.tejun");
+    const path = "examples/press_feeder.tejun";
+    expect(runCli(["run"], io).code).toBe(2);
+    expect(runCli(["run", path, "--scenario", "missing.scenario"], io).stderr).toContain("cannot read 'missing.scenario'");
+    expect(runCli(["run", path, "--jam", "clamp_ext_l"], io).stderr).toContain("did you mean 'clamp_ext_ls'?");
+    expect(runCli(["run", path, "--jam", "conveyor"], io).stderr).toContain("not a bool input");
+    expect(runCli(["run", path, "--jam", "clamp_ext_ls=maybe"], io).stderr).toContain("must be on or off");
+    expect(runCli(["run", path, "--until", "10"], io).stderr).toContain("needs a time such as 5s");
+    expect(runCli(["run", path, "--scan"], io).stderr).toContain("'--scan' needs a value");
   });
 });

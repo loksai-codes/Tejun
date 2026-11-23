@@ -23,3 +23,15 @@ export {
   type ScenarioFollow,
   type ScenarioError,
 } from "./scenario.js";
+export {
+  simulate,
+  DEFAULT_SCAN_MS,
+  DEFAULT_UNTIL_MS,
+  type Jam,
+  type SimulationOptions,
+  type SimulationResult,
+  type TimelineEvent,
+  type TimedEvent,
+  type ScanRecord,
+} from "./simulate.js";
+export { formatTimeline, type TimelineHeader } from "./timeline.js";

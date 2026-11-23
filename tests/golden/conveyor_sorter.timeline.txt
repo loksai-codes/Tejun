@@ -1,0 +1,27 @@
+ConveyorSorter コンベア仕分け · scenario examples/conveyor_sorter.scenario · scan 20 ms
+   time  event
+  0.000  start in Home                      outputs: pusher_in
+  0.000  pusher_ret_ls ON (pusher)
+  0.000  estop_ok ON (default)
+  0.020  Home -> Run                        outputs: belt
+  1.000  part_at_gate ON (scenario)
+  1.000  metal_sensor ON (scenario)
+  1.000  Run -> Sense                       outputs: all OFF
+  1.020  Sense -> Push                      outputs: pusher_out
+  1.040  pusher_ret_ls OFF (pusher)
+  1.100  part_at_gate OFF (scenario)
+  1.100  metal_sensor OFF (scenario)
+  1.320  pusher_ext_ls ON (pusher)
+  1.340  Push -> Back                       outputs: pusher_in
+  1.360  pusher_ext_ls OFF (pusher)
+  1.640  pusher_ret_ls ON (pusher)
+  1.660  Back -> Run                        outputs: belt
+  3.000  part_at_gate ON (scenario)
+  3.000  Run -> Sense                       outputs: all OFF
+  3.020  Sense -> Pass                      outputs: belt
+  3.100  part_at_gate OFF (scenario)
+  4.000  exit_eye ON (scenario)
+  4.000  Pass -> Run                        outputs: belt
+  4.100  exit_eye OFF (scenario)
+end at 6.000 s: Run (time limit)
+終了 6.000 秒: Run (時間制限)

@@ -1,0 +1,29 @@
+PressFeeder プレス送り · scenario examples/press_feeder.scenario · scan 20 ms
+   time  event
+  0.000  start in Home                      outputs: clamp_in
+  0.000  clamp_ret_ls ON (clamp)
+  0.000  estop_ok ON (default)
+  0.020  Home -> Idle                       outputs: conveyor
+  1.000  part_present ON (scenario)
+  1.000  Idle -> Clamp                      outputs: clamp_out
+  1.020  clamp_ret_ls OFF (clamp)
+  1.300  clamp_ext_ls ON (clamp)
+  1.320  Clamp -> Press                     outputs: all OFF
+  1.500  part_present OFF (scenario)
+  2.000  press_force = 12 kN (scenario)
+  2.860  Press -> Release                   outputs: clamp_in
+  2.880  clamp_ext_ls OFF (clamp)
+  3.160  clamp_ret_ls ON (clamp)
+  3.180  Release -> Idle                    outputs: conveyor
+  6.000  part_present ON (scenario)
+  6.000  Idle -> Clamp                      outputs: clamp_out
+  6.020  clamp_ret_ls OFF (clamp)
+  6.300  clamp_ext_ls ON (clamp)
+  6.320  Clamp -> Press                     outputs: all OFF
+  6.500  part_present OFF (scenario)
+  7.860  Press -> Release                   outputs: clamp_in
+  7.880  clamp_ext_ls OFF (clamp)
+  8.160  clamp_ret_ls ON (clamp)
+  8.180  Release -> Idle                    outputs: conveyor
+end at 10.000 s: Idle (time limit)
+終了 10.000 秒: Idle (時間制限)
