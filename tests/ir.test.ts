@@ -55,7 +55,7 @@ describe("IR", () => {
   });
 
   it("numbers faults in order of first appearance, without duplicates", () => {
-    expect(irOf("press_feeder.tejun").faults).toEqual(["OVERLOAD", "CLAMP_TIMEOUT", "RELEASE_TIMEOUT"]);
+    expect(irOf("press_feeder.tejun").faults).toEqual(["OVERLOAD", "HOME_TIMEOUT", "CLAMP_TIMEOUT", "RELEASE_TIMEOUT"]);
     expect(irOf("pick_place.tejun").faults).toEqual([
       "Z_DOWN_TIMEOUT",
       "NO_VACUUM",

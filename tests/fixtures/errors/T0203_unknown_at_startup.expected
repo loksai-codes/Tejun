@@ -1,0 +1,10 @@
+error[T0203]: interlock violated: `conveyor` can be ON while `clamp.retracted` is false
+  --> tests/fixtures/errors/T0203_unknown_at_startup.tejun:19:21
+   |
+19 |     state Idle    { conveyor on; when part_present forever -> Clamp }
+   |                     ^^^^^^^^^^^ `conveyor` is ON here in `Idle`
+   |
+   = path: Idle (at startup)
+   = interlock: `interlock conveyor requires clamp.retracted` (line 16)
+   = help: the position of `clamp` is unknown at startup; confirm it first, e.g. `state Home { clamp.retract within 2 s else fault HOME_TIMEOUT; -> Idle }`
+   = 日本語: インターロック違反: `clamp.retracted` が偽のときに `conveyor` がONになる可能性があります

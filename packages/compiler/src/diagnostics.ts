@@ -45,6 +45,7 @@ export const DIAGNOSTIC_CODES = {
   T0207: "statement after a transition",
   T0208: "more than one step in a state",
   T0209: "handler does not go to `Stopped`",
+  T0210: "station too large to prove",
 
   T0301: "two signals on one address",
   T0302: "address does not match the signal direction",

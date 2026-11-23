@@ -19,6 +19,7 @@ station ConveyorSorter "コンベア仕分け" {
   interlock never (belt and pusher_out)
   interlock belt requires pusher.retracted
   sequence main {
+    state Home  { pusher.retract within 1500 ms else fault HOME_TIMEOUT; -> Run }
     state Run   { belt on; when part_at_gate forever -> Sense }
     // First true transition wins; the bare "-> Pass" is the default.
     state Sense { when metal_sensor -> Push; -> Pass }

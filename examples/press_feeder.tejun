@@ -1,5 +1,6 @@
 // Press feeder: clamp an incoming part, press it, release it.
 // The clamp is a double-acting cylinder with a limit switch at each end.
+// Home confirms the clamp is retracted before the conveyor may run.
 station PressFeeder "プレス送り" {
   io {
     input  part_present : bool     @ %IX0.0  "ワーク検出"
@@ -17,6 +18,7 @@ station PressFeeder "プレス送り" {
   interlock conveyor requires clamp.retracted
   interlock press_force < 40 kN else fault OVERLOAD
   sequence main {
+    state Home    { clamp.retract within 2 s else fault HOME_TIMEOUT; -> Idle }
     state Idle    { conveyor on; when part_present forever -> Clamp }
     state Clamp   { clamp.extend within 2 s else fault CLAMP_TIMEOUT; -> Press }
     state Press   { hold 1500 ms; -> Release }

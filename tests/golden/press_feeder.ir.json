@@ -127,8 +127,29 @@
       "fault": "OVERLOAD"
     }
   ],
-  "initialState": "Idle",
+  "initialState": "Home",
   "states": [
+    {
+      "name": "Home",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "clamp",
+        "action": "retract",
+        "drive": "clamp_in",
+        "done": "clamp_ret_ls",
+        "timeout": {
+          "kind": "within",
+          "ms": 2000,
+          "fault": "HOME_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Idle"
+        }
+      ]
+    },
     {
       "name": "Idle",
       "outputs": [
@@ -205,6 +226,7 @@
   ],
   "faults": [
     "OVERLOAD",
+    "HOME_TIMEOUT",
     "CLAMP_TIMEOUT",
     "RELEASE_TIMEOUT"
   ],

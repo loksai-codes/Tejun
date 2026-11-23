@@ -29,7 +29,7 @@ describe("diagnostic fixtures", () => {
 
   it("every diagnostic code has at least one fixture", () => {
     // Codes registered ahead of the phase that implements them.
-    const reserved = new Set(["T0203"]); // interlock violated: Phase 4
+    const reserved = new Set<string>();
     const covered = new Set(fixtures.map((f) => f.slice(0, 5)));
     const missing = Object.keys(DIAGNOSTIC_CODES).filter((c) => !reserved.has(c) && !covered.has(c));
     expect(missing).toEqual([]);

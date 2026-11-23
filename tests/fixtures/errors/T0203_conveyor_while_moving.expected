@@ -1,0 +1,10 @@
+error[T0203]: interlock violated: `conveyor` can be ON while `clamp.retracted` is false
+  --> tests/fixtures/errors/T0203_conveyor_while_moving.tejun:23:21
+   |
+23 |     state Release { conveyor on; clamp.retract within 2 s else fault RELEASE_TIMEOUT; -> Idle }
+   |                     ^^^^^^^^^^^ `conveyor` is ON here in `Release`
+   |
+   = path: Home -> Idle -> Clamp -> Press -> Release
+   = interlock: `interlock conveyor requires clamp.retracted` (line 16)
+   = help: `clamp` is still moving in `Release`; switch `conveyor` on only after the move is confirmed
+   = 日本語: インターロック違反: `clamp.retracted` が偽のときに `conveyor` がONになる可能性があります

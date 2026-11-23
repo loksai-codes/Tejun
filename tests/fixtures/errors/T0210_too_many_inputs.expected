@@ -1,0 +1,9 @@
+error[T0210]: station `Big` has 12 inputs to explore; the interlock proof handles at most 10
+ --> tests/fixtures/errors/T0210_too_many_inputs.tejun:2:9
+  |
+2 | station Big "大きすぎる" {
+  |         ^^^ too many inputs
+  |
+  = inputs: estop_ok, s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10
+  = help: split the machine into smaller stations, each with its own sequence
+  = 日本語: ステーション `Big` には探索する入力が 12 個あります。インターロック証明は最大 10 個までです

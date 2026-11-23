@@ -56,7 +56,10 @@ describe("checker", () => {
   });
 
   it("allows == and != between bools", () => {
-    expect(codes(station({ extra: "  interlock never (a == b)\n  interlock never (a != not b)" }))).toEqual([]);
+    // As runtime monitors: `never (a == b)` would rightly fail the proof, since inputs are free.
+    const handlers = "  on fault { outputs safe; -> Stopped }\n  on not estop_ok { outputs safe; -> Stopped }";
+    const extra = "  interlock a == b else fault F\n  interlock a != not b else fault G";
+    expect(codes(station({ extra, handlers }))).toEqual([]);
   });
 
   it("allows safety signals in interlocks and handlers", () => {
@@ -127,5 +130,23 @@ describe("checker", () => {
     const d = check("t.tejun", text).diagnostics;
     expect(d.map((x) => x.code)).toEqual(["T0205"]);
     expect(d[0]!.help).toContain("declare the E-stop input");
+  });
+});
+
+describe("interlock proof", () => {
+  it("reports an output that ignores the input its interlock requires", () => {
+    const d = check("t.tejun", station({ extra: "  interlock y requires b" })).diagnostics;
+    expect(d.map((x) => x.code)).toEqual(["T0203"]);
+    expect(d[0]!.notes).toContain("path: S (at startup)");
+  });
+
+  it("accepts the same interlock once the sequence reacts to the input", () => {
+    const states = "    state S { when b forever -> On }\n    state On { y on; when not b forever -> S }";
+    expect(codes(station({ extra: "  interlock y requires b", states }))).toEqual([]);
+  });
+
+  it("counts E-stop as reacting in the same scan", () => {
+    // y is ON in S, but outputs are written after the E-stop handler runs.
+    expect(codes(station({ extra: "  interlock y requires estop_ok" }))).toEqual([]);
   });
 });

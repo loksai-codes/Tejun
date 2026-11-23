@@ -3,6 +3,7 @@
 
 import type { Program } from "./ast.js";
 import { runChecker } from "./checker/index.js";
+import { checkInterlocks } from "./checker/interlocks.js";
 import { DiagnosticAbort, type Diagnostic } from "./diagnostics.js";
 import { buildIR, type StationIR } from "./ir.js";
 import { lexAll, type Token } from "./lexer.js";
@@ -48,5 +49,8 @@ export function check(path: string, text: string): CheckResult {
   if (!parsed.program) return { source, ...parsed };
   const diagnostics = runChecker(source, parsed.program);
   if (diagnostics.length > 0) return { source, program: parsed.program, diagnostics };
-  return { source, program: parsed.program, diagnostics, ir: buildIR(parsed.program) };
+  const ir = buildIR(parsed.program);
+  const violations = checkInterlocks(ir, parsed.program, source);
+  if (violations.length > 0) return { source, program: parsed.program, diagnostics: violations };
+  return { source, program: parsed.program, diagnostics, ir };
 }

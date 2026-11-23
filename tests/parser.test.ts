@@ -102,7 +102,7 @@ describe("parser: examples", () => {
       "RequiresInterlock",
       "ConditionInterlock",
     ]);
-    expect(station.sequence.states.map((s) => s.name.name)).toEqual(["Idle", "Clamp", "Press", "Release"]);
+    expect(station.sequence.states.map((s) => s.name.name)).toEqual(["Home", "Idle", "Clamp", "Press", "Release"]);
     expect(station.handlers.map((h) => [h.trigger.kind, h.target.name])).toEqual([
       ["FaultTrigger", "Stopped"],
       ["NotExpr", "Stopped"],
@@ -127,7 +127,7 @@ describe("parser: examples", () => {
 
   it("parses statements and timeouts", () => {
     const { states } = parseExample("press_feeder.tejun").program.station.sequence;
-    const [idle, clamp, press] = states;
+    const [idle, clamp, press] = ["Idle", "Clamp", "Press"].map((n) => states.find((s) => s.name.name === n));
     expect(idle!.statements.map((s) => s.kind)).toEqual(["OutputOn", "When"]);
     expect((idle!.statements[1] as AST.When).timeout?.kind).toBe("ForeverTimeout");
     const extend = clamp!.statements[0] as AST.DeviceAction;
@@ -157,16 +157,16 @@ describe("parser: examples", () => {
 
   it("records exact spans", () => {
     const { program, text } = parseExample("press_feeder.tejun");
-    const idle = program.station.sequence.states[0]!;
-    expect(idle.span).toMatchObject({ line: 20, col: 5, endLine: 20 });
-    expect(idle.name.span).toMatchObject({ line: 20, col: 11, endCol: 15 });
+    const idle = program.station.sequence.states.find((s) => s.name.name === "Idle")!;
+    expect(idle.span).toMatchObject({ line: 22, col: 5, endLine: 22 });
+    expect(idle.name.span).toMatchObject({ line: 22, col: 11, endCol: 15 });
     expect(text.slice(idle.span.start, idle.span.end)).toBe(
       "state Idle    { conveyor on; when part_present forever -> Clamp }",
     );
     // Columns after Japanese text count code points.
     const estop = program.station.io.decls.find((d) => d.name.name === "estop_ok")!;
-    const line8 = text.split("\n")[7]!;
-    expect(estop.safety).toMatchObject({ line: 8, col: Array.from(line8).indexOf("s", 50) + 1 });
+    const line9 = text.split("\n")[8]!;
+    expect(estop.safety).toMatchObject({ line: 9, col: Array.from(line9).indexOf("s", 50) + 1 });
   });
 });
 

@@ -1,0 +1,33 @@
+// T0210: eleven inputs plus the E-stop exceed the proof's limit of ten.
+station Big "大きすぎる" {
+  io {
+    input  s0  : bool @ %IX0.0
+    input  s1  : bool @ %IX0.1
+    input  s2  : bool @ %IX0.2
+    input  s3  : bool @ %IX0.3
+    input  s4  : bool @ %IX0.4
+    input  s5  : bool @ %IX0.5
+    input  s6  : bool @ %IX0.6
+    input  s7  : bool @ %IX0.7
+    input  s8  : bool @ %IX1.0
+    input  s9  : bool @ %IX1.1
+    input  s10 : bool @ %IX1.2
+    input  estop_ok : bool @ %IX2.0 safety
+    output lamp     : bool @ %QX0.0
+  }
+  interlock never (lamp and not estop_ok)
+  sequence main {
+    state A0 { when s0 forever -> A1 }
+    state A1 { when s1 forever -> A2 }
+    state A2 { when s2 forever -> A3 }
+    state A3 { when s3 forever -> A4 }
+    state A4 { when s4 forever -> A5 }
+    state A5 { when s5 forever -> A6 }
+    state A6 { when s6 forever -> A7 }
+    state A7 { when s7 forever -> A8 }
+    state A8 { when s8 forever -> A9 }
+    state A9 { when s9 forever -> A10 }
+    state A10 { when s10 forever -> A0 }
+  }
+  on not estop_ok { outputs safe; -> Stopped }
+}

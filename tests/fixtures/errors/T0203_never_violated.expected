@@ -1,0 +1,10 @@
+error[T0203]: interlock violated: `(vacuum and x_out)` can become true
+  --> tests/fixtures/errors/T0203_never_violated.tejun:28:20
+   |
+28 |     state Carry  { vacuum on; x.extend within 2 s else fault X_OUT_TIMEOUT; -> Place }
+   |                    ^^^^^^^^^ can happen here in `Carry`
+   |
+   = path: Wait -> Pick -> Grip -> Lift -> Carry
+   = interlock: `interlock never (vacuum and x_out)` (line 22)
+   = help: `vacuum` and `x_out` are both ON in `Carry`; switch one of them off there
+   = 日本語: インターロック違反: `(vacuum and x_out)` が真になる可能性があります
