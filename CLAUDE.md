@@ -1,12 +1,13 @@
 # Tejun (手順) — project guide for Claude Code
 
 ## Current state (as of 2026-11-23)
-Phase 1 in progress (`BUILD_PROMPTS.md` has the phase plan).
-- Done: npm-workspaces monorepo (`packages/compiler`, `packages/runtime`,
-  `packages/cli`), strict TypeScript, Vitest smoke test, GitHub Actions CI.
-  The packages are placeholders; `tejun check|build|run` print "not implemented yet".
-- Next: example programs in `examples/` (reviewed by the user before the
-  grammar), then `docs/grammar.ebnf`.
+Phase 1 done (`BUILD_PROMPTS.md` has the phase plan).
+- npm-workspaces monorepo (`packages/compiler`, `packages/runtime`,
+  `packages/cli`), strict TypeScript, Vitest, GitHub Actions CI. The packages are
+  placeholders; `tejun check|build|run` print "not implemented yet".
+- `examples/`: press_feeder, conveyor_sorter, pick_place (each ≤ 40 lines, tested).
+- `docs/grammar.ebnf` covers all three examples.
+- Next: Phase 2 (lexer, parser, AST, diagnostics, `tejun check`).
 - Not added yet: `docs/SPEC.md` (work from this file until it exists). No GitHub remote yet.
 Update this section as phases are completed.
 
@@ -47,7 +48,7 @@ station PressFeeder "プレス送り" {
   interlock conveyor requires clamp.retracted
   interlock press_force < 40 kN else fault OVERLOAD
   sequence main {
-    state Idle    { conveyor on; when part_present -> Clamp }
+    state Idle    { conveyor on; when part_present forever -> Clamp }
     state Clamp   { clamp.extend within 2 s else fault CLAMP_TIMEOUT; -> Press }
     state Press   { hold 1500 ms; -> Release }
     state Release { clamp.retract within 2 s else fault RELEASE_TIMEOUT; -> Idle }
@@ -56,6 +57,17 @@ station PressFeeder "プレス送り" {
   on not estop_ok { outputs safe; -> Stopped }
 }
 ```
+Semantics agreed in Phase 1 (the grammar and examples follow them):
+- A wait carries its timeout before the arrow: `when c within 500 ms else fault F -> S`,
+  or `when c forever -> S` when waiting forever is intended. Device actions use the
+  same `within … else fault …` form.
+- Transitions in a state are tried top to bottom; the first true one wins. A `when`
+  followed by a bare `-> S` is a branch and needs no timeout.
+- Outputs not switched `on` in a state are OFF in that state (there is no `off`).
+- `Stopped` is a built-in state; fault and E-stop handlers go there.
+- In `io` lines the label comes before `safety` / `range`.
+- Device kinds: only `Cylinder` (double-acting: extend, retract, at_ext, at_ret).
+
 The grammar lives in `docs/grammar.ebnf`. If you change syntax, update the
 grammar, `docs/language-reference.md`, and the examples in the same change.
 
@@ -81,6 +93,11 @@ Explore every reachable (state × input combination). Each input is free
 (true/false) each scan; timers are abstracted to done / not done. If any
 reachable combination violates an interlock, report the shortest path of
 states. Cap stations at ~10 inputs; emit a clear error above the cap.
+
+Device-state interlocks such as `conveyor requires clamp.retracted` must use the
+device position implied by its last completed action (confirmed by its feedback
+sensor), not the raw sensor as a free input; otherwise every state that runs the
+conveyor would be reported as a violation.
 
 ## Diagnostics format
 ```

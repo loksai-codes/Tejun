@@ -1,0 +1,37 @@
+// Pick and place: lift a part from the infeed and set it down on the outfeed.
+// Z (down/up) and X (out/home) are double-acting cylinders; a vacuum cup holds
+// the part. Outputs not mentioned in a state are OFF, so "vacuum on" repeats.
+station PickPlace "ピック&プレース" {
+  io {
+    input  part_ready : bool @ %IX0.0  "供給位置ワーク有"
+    input  z_down_ls  : bool @ %IX0.1  "Z下降端"
+    input  z_up_ls    : bool @ %IX0.2  "Z上昇端"
+    input  x_out_ls   : bool @ %IX0.3  "X前進端"
+    input  x_home_ls  : bool @ %IX0.4  "X原点"
+    input  vacuum_ok  : bool @ %IX0.5  "真空確認"
+    input  estop_ok   : bool @ %IX0.7  "非常停止OK" safety
+    output z_down     : bool @ %QX0.0  "Z下降"
+    output z_up       : bool @ %QX0.1  "Z上昇"
+    output x_out      : bool @ %QX0.2  "X前進"
+    output x_home     : bool @ %QX0.3  "X後退"
+    output vacuum     : bool @ %QX0.4  "真空"
+  }
+  device z : Cylinder(extend: z_down, retract: z_up, at_ext: z_down_ls, at_ret: z_up_ls)
+  device x : Cylinder(extend: x_out, retract: x_home, at_ext: x_out_ls, at_ret: x_home_ls)
+  // X may only travel with Z fully up.
+  interlock x_out requires z.retracted
+  interlock x_home requires z.retracted
+  sequence main {
+    state Wait   { when part_ready forever -> Pick }
+    state Pick   { z.extend within 1 s else fault Z_DOWN_TIMEOUT; -> Grip }
+    state Grip   { vacuum on; when vacuum_ok within 500 ms else fault NO_VACUUM -> Lift }
+    state Lift   { vacuum on; z.retract within 1 s else fault Z_UP_TIMEOUT; -> Carry }
+    state Carry  { vacuum on; x.extend within 2 s else fault X_OUT_TIMEOUT; -> Place }
+    state Place  { vacuum on; z.extend within 1 s else fault Z_DOWN_TIMEOUT; -> Drop }
+    state Drop   { when not vacuum_ok within 500 ms else fault VACUUM_STUCK -> Rise }
+    state Rise   { z.retract within 1 s else fault Z_UP_TIMEOUT; -> Return }
+    state Return { x.retract within 2 s else fault X_HOME_TIMEOUT; -> Wait }
+  }
+  on fault        { outputs safe; -> Stopped }
+  on not estop_ok { outputs safe; -> Stopped }
+}

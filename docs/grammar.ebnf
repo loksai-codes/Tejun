@@ -1,0 +1,166 @@
+(* Tejun (手順) grammar
+ *
+ * Covers exactly the constructs used by examples/*.tejun. When the syntax
+ * changes, update this file, docs/language-reference.md and the examples in
+ * the same change.
+ *
+ * Notation (ISO 14977 style):
+ *   rule = ... ;     definition
+ *   "x"              terminal (keyword or symbol)
+ *   a b              sequence
+ *   a | b            choice
+ *   [ a ]            optional
+ *   { a }            zero or more
+ *   ( a )            grouping
+ *   UPPER_CASE       token defined in the lexical section
+ *
+ * Several rules are deliberately looser than the language: the parser accepts
+ * the shape and the checker reports a clearer error with a diagnostic code.
+ * Those places are marked "checker:".
+ *)
+
+
+(* ===== Program structure ===== *)
+
+program      = station ;
+
+(* Sections appear in this fixed order. *)
+station      = "station" IDENT [ STRING ] "{"
+                 io_block
+                 { device_decl }
+                 { interlock }
+                 sequence
+                 { handler }
+               "}" ;
+
+
+(* ===== I/O ===== *)
+
+io_block     = "io" "{" { io_decl } "}" ;
+
+io_decl      = direction IDENT ":" type "@" ADDRESS
+               [ STRING ]                    (* label, usually Japanese *)
+               [ "safety" ]                  (* checker: T03xx, safety signals stay out of normal logic *)
+               [ range ] ;
+
+direction    = "input" | "output" ;
+
+type         = "bool"
+             | "real" [ "<" IDENT ">" ] ;    (* unit, e.g. real<kN>; checker: known unit, T01xx *)
+
+range        = "range" NUMBER ".." NUMBER ;
+
+
+(* ===== Devices ===== *)
+
+(* checker: device kind exists (only Cylinder for now) and every
+   parameter is wired to a signal of the right direction, T04xx. *)
+device_decl  = "device" IDENT ":" IDENT "(" device_arg { "," device_arg } ")" ;
+
+device_arg   = IDENT ":" IDENT ;
+
+
+(* ===== Interlocks ===== *)
+
+(* The "requires" form is recognised by looking one token past the first
+   IDENT; otherwise the line is a condition interlock. *)
+interlock    = "interlock"
+               ( "never" expr                          (* expr must never hold *)
+               | IDENT "requires" expr                 (* output may be ON only while expr holds *)
+               | expr "else" "fault" IDENT             (* expr must always hold, or raise the fault *)
+               ) ;
+
+
+(* ===== Sequence and states ===== *)
+
+sequence     = "sequence" IDENT "{" state { state } "}" ;
+
+state        = "state" IDENT "{" [ statement { ";" statement } [ ";" ] ] "}" ;
+
+statement    = output_on
+             | device_action
+             | hold
+             | when
+             | goto ;
+
+(* Outputs not switched on in a state are OFF in that state, so there is
+   no "off" statement. Each output is decided in exactly one place per state. *)
+output_on    = IDENT "on" ;
+
+(* e.g. clamp.extend within 2 s else fault CLAMP_TIMEOUT *)
+device_action = IDENT "." IDENT [ timeout ] ;   (* checker: timeout required, T02xx *)
+
+hold         = "hold" duration ;
+
+(* Transitions are tried top to bottom; the first true one is taken.
+   A "when" followed later in the state by a bare goto is a branch and needs
+   no timeout. A "when" that can wait needs a timeout (checker: T02xx). *)
+when         = "when" expr [ timeout ] "->" IDENT ;
+
+goto         = "->" IDENT ;
+
+timeout      = "within" duration "else" "fault" IDENT
+             | "forever" ;
+
+duration     = NUMBER IDENT ;                   (* checker: unit is ms or s, T01xx *)
+
+
+(* ===== Fault and E-stop handlers ===== *)
+
+(* "Stopped" is a built-in state and is not declared in the sequence. *)
+handler      = "on" ( "fault" | expr ) "{" "outputs" "safe" ";" goto [ ";" ] "}" ;
+
+
+(* ===== Expressions =====
+ * Parsed with Pratt parsing. Precedence, lowest to highest:
+ *   or  <  and  <  not  <  comparison  <  operand
+ * Comparisons do not chain (a < b < c is a syntax error).
+ *)
+
+expr         = or_expr ;
+or_expr      = and_expr { "or" and_expr } ;
+and_expr     = not_expr { "and" not_expr } ;
+not_expr     = "not" not_expr | comparison ;
+comparison   = operand [ compare_op operand ] ;
+compare_op   = "<" | "<=" | ">" | ">=" | "==" | "!=" ;
+
+operand      = quantity
+             | IDENT [ "." IDENT ]               (* signal, or device state such as clamp.retracted *)
+             | "(" expr ")" ;
+
+quantity     = NUMBER [ IDENT ] ;                (* e.g. 40 kN; checker: unit matches, T01xx *)
+
+
+(* ===== Lexical structure ===== *)
+
+(* Source is UTF-8. Non-ASCII text is allowed only in STRING and comments. *)
+
+IDENT        = letter { letter | digit | "_" } ;   (* not a keyword *)
+letter       = "A".."Z" | "a".."z" | "_" ;
+digit        = "0".."9" ;
+
+(* A "." is part of a NUMBER only when a digit follows, so 0..50 lexes as
+   NUMBER ".." NUMBER. *)
+NUMBER       = digit { digit } [ "." digit { digit } ] ;
+
+(* No escape sequences. A string may not span lines. *)
+STRING       = '"' { any character except '"' and newline } '"' ;
+
+(* IEC 61131-3 direct addresses: bit (%IX0.0, %QX0.2) or word (%IW2).
+   Bit index is 0..7. A malformed address such as %QX9 is a syntax error. *)
+ADDRESS      = "%" ( "I" | "Q" ) ( "X" digit { digit } "." bit | "W" digit { digit } ) ;
+bit          = "0".."7" ;
+
+(* Comments run from // to the end of the line. Whitespace and comments
+   separate tokens and are otherwise ignored. *)
+
+(* Keywords (reserved, cannot be used as IDENT):
+     station io input output bool real safety range device
+     interlock never requires else fault sequence state
+     on hold when within forever outputs safe and or not
+
+   Units (ms, s, kN, N, ...) and device kinds (Cylinder) are ordinary
+   identifiers checked by the checker, not keywords.
+
+   Symbols:
+     {  }  (  )  :  ;  ,  .  ..  @  ->  <  <=  >  >=  ==  != *)

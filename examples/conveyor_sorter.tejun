@@ -1,0 +1,31 @@
+// Conveyor sorter: the belt stops each part at a gate. Metal parts are
+// pushed into a side chute; everything else rides on to the exit.
+station ConveyorSorter "コンベア仕分け" {
+  io {
+    input  part_at_gate  : bool @ %IX0.0  "ゲート前ワーク検出"
+    input  metal_sensor  : bool @ %IX0.1  "金属センサ"
+    input  pusher_ext_ls : bool @ %IX0.2  "プッシャ前進端"
+    input  pusher_ret_ls : bool @ %IX0.3  "プッシャ後退端"
+    input  exit_eye      : bool @ %IX0.4  "排出センサ"
+    input  estop_ok      : bool @ %IX0.7  "非常停止OK" safety
+    output belt          : bool @ %QX0.0  "ベルト"
+    output pusher_out    : bool @ %QX0.1  "プッシャ前進"
+    output pusher_in     : bool @ %QX0.2  "プッシャ後退"
+  }
+  device pusher : Cylinder(extend: pusher_out, retract: pusher_in,
+                           at_ext: pusher_ext_ls, at_ret: pusher_ret_ls)
+  // Never push while the belt is moving, and never run the belt
+  // with the pusher sticking out across it.
+  interlock never (belt and pusher_out)
+  interlock belt requires pusher.retracted
+  sequence main {
+    state Run   { belt on; when part_at_gate forever -> Sense }
+    // First true transition wins; the bare "-> Pass" is the default.
+    state Sense { when metal_sensor -> Push; -> Pass }
+    state Push  { pusher.extend within 1500 ms else fault PUSH_TIMEOUT; -> Back }
+    state Back  { pusher.retract within 1500 ms else fault BACK_TIMEOUT; -> Run }
+    state Pass  { belt on; when exit_eye within 5 s else fault EXIT_JAM -> Run }
+  }
+  on fault        { outputs safe; -> Stopped }
+  on not estop_ok { outputs safe; -> Stopped }
+}
