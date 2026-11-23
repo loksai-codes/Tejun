@@ -52,6 +52,11 @@ export class Plant {
     return out;
   }
 
+  /** Device name -> how far it is extended, from 0 (retracted) to 1 (extended). */
+  positions(): Record<string, number> {
+    return Object.fromEntries(this.cylinders.map((c) => [c.device, c.progress / this.travelMs]));
+  }
+
   /** Move the devices for `dtMs` with the given outputs. */
   advance(outputs: Readonly<Record<string, boolean>>, dtMs: number): void {
     for (const c of this.cylinders) {

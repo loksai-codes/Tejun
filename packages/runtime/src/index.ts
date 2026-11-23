@@ -25,6 +25,7 @@ export {
 } from "./scenario.js";
 export {
   simulate,
+  Simulation,
   DEFAULT_SCAN_MS,
   DEFAULT_UNTIL_MS,
   type Jam,
