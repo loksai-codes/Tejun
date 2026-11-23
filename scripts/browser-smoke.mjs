@@ -111,7 +111,12 @@ await send("Log.enable");
 await send("Page.enable");
 await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
 await send("Page.navigate", { url });
-await sleep(2500);
+// Wait for the app to render (a cold dev server serves Monaco as many modules).
+for (let i = 0; i < 60; i++) {
+  await sleep(500);
+  if (await evaluate("!!document.querySelector('.sim-status') && !!document.querySelector('.monaco-editor .view-lines')")) break;
+}
+await sleep(500);
 
 const report = {};
 report.title = await evaluate("document.title");
