@@ -95,13 +95,19 @@ function checkHandlers(ctx: CheckContext): void {
     const safety = st.io.decls.find(
       (d) => d.safety && d.direction === "input" && d.type.kind === "BoolType",
     )?.name.name;
+    // A handler like `on not estop_ok` whose input just lacks `safety`.
+    const unmarked = st.handlers
+      .map((h) => (h.trigger.kind === "NotExpr" && h.trigger.operand.kind === "NameRef" ? ctx.signal(h.trigger.operand.name) : undefined))
+      .find((sig) => sig?.direction === "input" && sig.type === "bool");
     ctx.error("T0205", st.name.span, {
       message: `station \`${st.name.name}\` has no E-stop handler`,
       messageJa: `ステーション \`${st.name.name}\` に非常停止ハンドラがありません`,
       label: "no E-stop handler",
       help: safety
         ? `add \`on not ${safety} { outputs safe; -> Stopped }\``
-        : "declare the E-stop input, e.g. `input estop_ok : bool @ %IX0.7 safety`, and add `on not estop_ok { outputs safe; -> Stopped }`",
+        : unmarked
+          ? `\`on not ${unmarked.name}\` exists, but \`${unmarked.name}\` is not marked \`safety\`; add \`safety\` to its declaration on line ${unmarked.decl.span.line}`
+          : "declare the E-stop input, e.g. `input estop_ok : bool @ %IX0.7 safety`, and add `on not estop_ok { outputs safe; -> Stopped }`",
     });
   }
 }

@@ -115,6 +115,13 @@ describe("checker", () => {
     expect(codes(text)).toEqual(["T0401"]);
   });
 
+  it("points at a missing `safety` mark when the E-stop handler exists", () => {
+    const text = station().replace(" safety", "");
+    const d = check("t.tejun", text).diagnostics;
+    expect(d.map((x) => x.code)).toEqual(["T0205"]);
+    expect(d[0]!.help).toContain("`estop_ok` is not marked `safety`");
+  });
+
   it("reports the E-stop handler missing when no safety input exists", () => {
     const text = station({ handlers: "" }).replace(" safety", "");
     const d = check("t.tejun", text).diagnostics;
