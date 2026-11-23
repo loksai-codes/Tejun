@@ -1,7 +1,7 @@
 # Tejun (手順) — project guide for Claude Code
 
 ## Current state (as of 2026-11-23)
-Phase 4 done in code (`BUILD_PROMPTS.md` has the phase plan).
+Phase 5 done (`BUILD_PROMPTS.md` has the phase plan).
 - Phase 1: npm-workspaces monorepo, strict TypeScript, Vitest, GitHub Actions CI;
   `examples/` (press_feeder, conveyor_sorter, pick_place); `docs/grammar.ebnf`.
 - Phase 2: lexer, parser, AST, diagnostics; syntax codes T0001–T0016; `tejun check <file>`.
@@ -14,8 +14,10 @@ Phase 4 done in code (`BUILD_PROMPTS.md` has the phase plan).
 - Not yet verified: the generated `.st` compiling in OpenPLC (the user does this by
   hand; matiec is not available in this environment). If it reports an error, fix
   `codegen/st.ts` and regenerate the ST goldens on purpose.
-- `tejun run` still prints "not implemented yet".
-- Next: Phase 5 (runtime interpreter on the same IR, `tejun run`, equivalence test).
+- Phase 5: `packages/runtime` (IR interpreter, simulated machine, scenarios, timeline);
+  `tejun run`; each example has a `.scenario`; equivalence test proves the simulator
+  matches the generated ST scan by scan.
+- Next: Phase 6 (web playground: Monaco editor, live diagnostics, SVG simulator).
 - Not added yet: `docs/SPEC.md` (work from this file until it exists). No GitHub remote yet.
 Update this section as phases are completed.
 
@@ -124,7 +126,17 @@ grammar, `docs/language-reference.md`, and the examples in the same change.
   once at the end of the block; generated names use the `tj_` prefix.
 - `packages/compiler/src/version.ts` — `VERSION`, used by the CLI and the ST header
 - `packages/compiler/src/diagnostics.ts` — Rust/Elm-style errors with codes, caret underline, help text, Japanese line
-- `packages/runtime/` — scan-cycle interpreter that reads the same IR as codegen
+- `packages/runtime/` — depends only on `@tejun/compiler` (for IR types):
+  - `station.ts` — `StationRuntime`, the scan-cycle interpreter; same scan order as
+    `codegen/st.ts`; re-checks never/requires after outputs and only *reports* violations
+  - `timer.ts` — `Ton`, the IEC/matiec on-delay timer on a simulated clock
+  - `plant.ts` — simulated machine: each Cylinder starts retracted, travels 300 ms,
+    drives its end sensors; both outputs off holds position
+  - `scenario.ts` — scenario files (`at <time> <input> = <value>`,
+    `follow <input> = <output> [after <time>]`, `until <time>`, `#` comments)
+  - `simulate.ts` — the loop: scenario + plant + follows + jams → one scan → plant moves;
+    returns events and a per-scan trace
+  - `timeline.ts` — the text timeline `tejun run` prints
 - `packages/cli/` — `tejun check | build | run`
 - `packages/playground/` — Monaco editor + 2D SVG simulator (later phase)
 
@@ -148,7 +160,7 @@ shortest path. Model, per scan:
 - A step completes in one scan; its transitions run from the next scan.
 `never` and `requires` are proved; `<cond> else fault` is a runtime monitor only.
 The ST generator follows exactly this scan order (see the header of `codegen/st.ts`);
-the Phase 5 interpreter must too.
+`runtime/station.ts` follows it too, and `tests/equivalence.test.ts` checks all three agree.
 
 ## Diagnostics format
 ```
@@ -192,7 +204,14 @@ How diagnostics work in code:
   Keep it that way for testing.
 - `tejun build <file> [-o dir]` writes `<dir>/<name>.st` (default dir `out`, gitignored);
   on errors it prints diagnostics like `tejun check` and writes nothing.
-- Exit codes: 0 OK, 1 the program has errors, 2 could not run (usage error,
+- `tejun run <file> [--scenario f] [--jam sensor[=on|off]]... [--until 5s] [--scan 20ms]`
+  simulates and prints a timeline. Default scenario: `<name>.scenario` next to the program,
+  if present. Safety inputs start ON, other inputs OFF/0. Device sensors belong to the
+  simulated machine; scenarios may not set them (use `--jam`). Runs end at `Stopped` or
+  the end time (scenario `until`, `--until`, else 10 s).
+  Example: `npx tejun run examples/press_feeder.tejun --jam clamp_ext_ls` → CLAMP_TIMEOUT.
+- Exit codes: 0 OK (for `run`: the simulation ran, even if the machine faulted),
+  1 the program or scenario has errors, 2 could not run (usage error,
   unreadable/unwritable file, internal error). Diagnostics go to stdout.
 - To try generated code in OpenPLC: `npx tejun build examples/press_feeder.tejun`, then
   upload `out/press_feeder.st` in OpenPLC Runtime (Programs → Upload Program). For
@@ -210,7 +229,15 @@ How diagnostics work in code:
   then read the diff before committing.
 - Each example's IR is a golden JSON file in `tests/golden/<example>.ir.json`
   (spans left out); regenerate the same way and review the state graph in the diff.
-- Every example in `examples/` must check clean, compile, and simulate in tests.
+- Every example in `examples/` must check clean, compile, and simulate in tests, and
+  needs a `<name>.scenario`. Golden timelines: `tests/golden/<name>.timeline.txt`
+  (plus `press_feeder.jam_clamp_ext_ls.timeline.txt`), written by `tests/cli.test.ts`.
+- `tests/equivalence.test.ts` runs the IR interpreter and the *generated ST* (through the
+  test-only `tests/support/st-interpreter.ts`) side by side and compares outputs,
+  `tj_state` and `tj_fault` every scan: each scenario, every device sensor jammed OFF/ON,
+  and seeded random inputs. If the generator starts emitting new ST constructs, extend
+  the ST interpreter (it throws on anything unsupported). Never weaken this test to make
+  it pass: a mismatch means the simulator and the PLC code disagree.
 - Golden-file tests for generated ST (`tests/golden/*.st`). Update goldens only on purpose, and say so.
   `tests/st.test.ts` also checks for every example that each output is assigned exactly
   once in the FUNCTION_BLOCK, that code outside comments is ASCII, and that blocks balance.
