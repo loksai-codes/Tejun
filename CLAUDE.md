@@ -1,13 +1,13 @@
 # Tejun (手順) — project guide for Claude Code
 
 ## Current state (as of 2026-11-23)
-Phase 1 done (`BUILD_PROMPTS.md` has the phase plan).
-- npm-workspaces monorepo (`packages/compiler`, `packages/runtime`,
-  `packages/cli`), strict TypeScript, Vitest, GitHub Actions CI. The packages are
-  placeholders; `tejun check|build|run` print "not implemented yet".
-- `examples/`: press_feeder, conveyor_sorter, pick_place (each ≤ 40 lines, tested).
-- `docs/grammar.ebnf` covers all three examples.
-- Next: Phase 2 (lexer, parser, AST, diagnostics, `tejun check`).
+Phase 2 done (`BUILD_PROMPTS.md` has the phase plan).
+- Phase 1: npm-workspaces monorepo, strict TypeScript, Vitest, GitHub Actions CI;
+  `examples/` (press_feeder, conveyor_sorter, pick_place); `docs/grammar.ebnf`.
+- Phase 2: `source.ts`, `diagnostics.ts`, `lexer.ts`, `ast.ts`, `parser.ts`, `api.ts`
+  in `packages/compiler/src`; syntax codes T0001–T0016 with golden fixtures;
+  `tejun check <file>` works. `tejun build|run` still print "not implemented yet".
+- Next: Phase 3 (checker: T01xx–T04xx, then the state-graph IR).
 - Not added yet: `docs/SPEC.md` (work from this file until it exists). No GitHub remote yet.
 Update this section as phases are completed.
 
@@ -115,6 +115,16 @@ Codes: T00xx syntax, T01xx names/types/units, T02xx safety (interlocks,
 timeouts, reachability), T03xx I/O, T04xx devices. Never print a raw stack
 trace to the user.
 
+How diagnostics work in code:
+- All codes are registered in `DIAGNOSTIC_CODES` in `diagnostics.ts`; add new codes there.
+- Every diagnostic has an English `message`, a Japanese `messageJa`, a `span`, and
+  usually a `label` (after the carets) and a `help` line.
+- Lexer and parser stop at the first syntax error by throwing `DiagnosticAbort`
+  internally; the public API in `api.ts` (`tokenize`, `parse`, `check`) catches it
+  and returns diagnostics as values. Nothing in the public API throws for user errors.
+- Carets are aligned by display width (Japanese/full-width chars count as 2).
+- Source text is normalized on load (BOM removed, CRLF → LF); paths are shown with `/`.
+
 ## Tech and commands
 - TypeScript (strict, ESM, `NodeNext` modules: relative imports end in `.js`),
   Node 22+, npm workspaces, Vitest. CI runs on Node 22 and 24.
@@ -123,13 +133,22 @@ trace to the user.
   from source, no build needed) · `npm run typecheck` (build + type-check tests)
 - `npx tejun ...` runs the compiled CLI; run `npm run build` first.
   The `bin` launcher `packages/cli/bin/tejun.js` is committed so npm can link it before a build.
-- CLI logic lives in `packages/cli/src/main.ts` as a pure `runCli(argv)` returning
-  `{ code, stdout, stderr }`; `src/index.ts` only does process I/O. Keep it that way for testing.
+- CLI logic lives in `packages/cli/src/main.ts` as `runCli(argv, io?)` returning
+  `{ code, stdout, stderr }`, with file reads injected through `io` so tests never touch
+  the disk; `src/index.ts` only does process I/O. Keep it that way for testing.
+- `tejun check` exit codes: 0 OK, 1 the program has errors, 2 could not check
+  (usage error, unreadable file, internal error). Diagnostics go to stdout.
 - Allowed runtime dependencies: none in compiler/runtime. Playground may use Monaco and React.
 - Ask before adding any dependency.
 
 ## Testing rules
 - Every diagnostic code has at least one failing example in `tests/fixtures/errors/` and a golden expected-output file.
+  Fixtures are named `<CODE>_<what>.tejun` (e.g. `T0010_missing_colon.tejun`) with a matching
+  `.expected`; the test checks the file produces exactly that one code. A test fails if a
+  registered code has no fixture.
+- Regenerate goldens on purpose with `UPDATE_GOLDEN=1 npm test` (Git Bash) or
+  `$env:UPDATE_GOLDEN=1; npm test; Remove-Item Env:UPDATE_GOLDEN` (PowerShell),
+  then read the diff before committing.
 - Every example in `examples/` must check clean, compile, and simulate in tests.
 - Golden-file tests for generated ST (`tests/golden/*.st`). Update goldens only on purpose, and say so.
 - Run `npm test` before saying a task is done. Fix failures; don't skip tests.

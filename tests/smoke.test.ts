@@ -17,7 +17,7 @@ describe("workspace wiring", () => {
 
   it("cli rejects unknown commands in English and Japanese", () => {
     const result = runCli(["frobnicate"]);
-    expect(result.code).toBe(1);
+    expect(result.code).toBe(2);
     expect(result.stderr).toContain("unknown command 'frobnicate'");
     expect(result.stderr).toContain("不明なコマンド");
   });
