@@ -16,6 +16,7 @@ export { generateST, type StOptions } from "./codegen/st.js";
 export type * as AST from "./ast.js";
 export {
   buildIR,
+  formatExpr,
   outputsOn,
   type StationIR,
   type SignalIR,
@@ -29,3 +30,4 @@ export {
   type ExprIR,
 } from "./ir.js";
 export { DEVICE_KINDS, CYLINDER, type DeviceKind } from "./device-kinds.js";
+export { closest } from "./suggest.js";

@@ -16,7 +16,7 @@
 // most portable form across ST compilers.
 
 import { DEVICE_KINDS } from "../device-kinds.js";
-import { outputsOn, type ExprIR, type StateIR, type StationIR, type TransitionIR } from "../ir.js";
+import { formatExpr as tejun, outputsOn, type ExprIR, type StateIR, type StationIR, type TransitionIR } from "../ir.js";
 import { VERSION } from "../version.js";
 
 const STOPPED = 0;
@@ -403,27 +403,4 @@ function time(ms: number): string {
 /** Keep user text from closing or opening an ST comment. */
 function comment(text: string): string {
   return text.replace(/\*\)/g, "* )").replace(/\(\*/g, "( *");
-}
-
-/** Render an IR expression in Tejun syntax, for comments. */
-function tejun(e: ExprIR): string {
-  switch (e.kind) {
-    case "signal":
-      return e.name;
-    case "device_state":
-      return `${e.device}.${e.state}`;
-    case "number":
-      return e.unit ? `${e.value} ${e.unit}` : String(e.value);
-    case "not":
-      return `not ${tejunOperand(e.operand)}`;
-    case "and":
-    case "or":
-      return `${tejunOperand(e.left)} ${e.kind} ${tejunOperand(e.right)}`;
-    case "compare":
-      return `${tejunOperand(e.left)} ${e.op} ${tejunOperand(e.right)}`;
-  }
-}
-
-function tejunOperand(e: ExprIR): string {
-  return e.kind === "and" || e.kind === "or" || e.kind === "compare" ? `(${tejun(e)})` : tejun(e);
 }

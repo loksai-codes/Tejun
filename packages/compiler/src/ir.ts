@@ -100,6 +100,26 @@ export type ExprIR =
   | { kind: "and" | "or"; left: ExprIR; right: ExprIR }
   | { kind: "compare"; op: A.CompareOp; left: ExprIR; right: ExprIR };
 
+/** Render an IR expression in Tejun syntax, e.g. `press_force < 40 kN`. */
+export function formatExpr(e: ExprIR): string {
+  const operand = (x: ExprIR) => (x.kind === "and" || x.kind === "or" || x.kind === "compare" ? `(${formatExpr(x)})` : formatExpr(x));
+  switch (e.kind) {
+    case "signal":
+      return e.name;
+    case "device_state":
+      return `${e.device}.${e.state}`;
+    case "number":
+      return e.unit ? `${e.value} ${e.unit}` : String(e.value);
+    case "not":
+      return `not ${operand(e.operand)}`;
+    case "and":
+    case "or":
+      return `${operand(e.left)} ${e.kind} ${operand(e.right)}`;
+    case "compare":
+      return `${operand(e.left)} ${e.op} ${operand(e.right)}`;
+  }
+}
+
 /** All outputs ON while the machine is in `state`. */
 export function outputsOn(state: StateIR): string[] {
   return state.step?.kind === "device" ? [...state.outputs, state.step.drive] : [...state.outputs];
