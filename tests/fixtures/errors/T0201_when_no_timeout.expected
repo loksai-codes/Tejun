@@ -1,0 +1,8 @@
+error[T0201]: `when part_present` can wait forever: it has no timeout
+  --> tests/fixtures/errors/T0201_when_no_timeout.tejun:18:34
+   |
+18 |     state Idle    { conveyor on; when part_present -> Clamp }
+   |                                  ^^^^^^^^^^^^^^^^^ no timeout
+   |
+   = help: add `within <time> else fault <CODE>` before `->`, or `forever` if waiting forever is intended
+   = 日本語: `when part_present` にタイムアウトがないため、永久に待つ可能性があります

@@ -9,6 +9,9 @@ import { CheckContext } from "./context.js";
 import { checkDevices } from "./devices.js";
 import { checkIo } from "./io.js";
 import { checkNames } from "./names.js";
+import { checkReachability } from "./reachability.js";
+import { checkStates } from "./states.js";
+import { checkTimeouts } from "./timeouts.js";
 import { checkTypes } from "./types.js";
 import { checkUnits } from "./units.js";
 
@@ -19,6 +22,9 @@ export function runChecker(source: SourceFile, program: Program): Diagnostic[] {
   checkTypes(ctx);
   checkIo(ctx);
   checkDevices(ctx);
+  checkStates(ctx);
+  checkTimeouts(ctx);
+  checkReachability(ctx);
   return sortDiagnostics(ctx.diagnostics);
 }
 

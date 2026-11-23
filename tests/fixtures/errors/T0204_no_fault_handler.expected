@@ -1,0 +1,8 @@
+error[T0204]: fault `OVERLOAD` can be raised, but there is no `on fault` handler
+  --> tests/fixtures/errors/T0204_no_fault_handler.tejun:16:44
+   |
+16 |   interlock press_force < 40 kN else fault OVERLOAD
+   |                                            ^^^^^^^^ nowhere to go
+   |
+   = help: add `on fault { outputs safe; -> Stopped }` at the end of the station
+   = 日本語: 故障 `OVERLOAD` が発生する可能性がありますが、`on fault` ハンドラがありません

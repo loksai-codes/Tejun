@@ -1,0 +1,8 @@
+error[T0208]: state `Press` has more than one step
+  --> tests/fixtures/errors/T0208_two_steps.tejun:20:35
+   |
+20 |     state Press   { hold 1500 ms; hold 500 ms; -> Release }
+   |                                   ^^^^^^^^^^^ second step
+   |
+   = help: a state waits for one thing at a time; move `hold 500 ms` into its own state
+   = 日本語: 状態 `Press` に複数のステップがあります

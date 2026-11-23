@@ -1,0 +1,8 @@
+error[T0202]: state `Spare` can never be reached
+  --> tests/fixtures/errors/T0202_unreachable_state.tejun:22:11
+   |
+22 |     state Spare   { -> Idle }
+   |           ^^^^^ unreachable
+   |
+   = help: no transition leads here from the start state `Idle`
+   = 日本語: 状態 `Spare` に到達できません

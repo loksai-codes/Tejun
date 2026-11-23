@@ -1,0 +1,8 @@
+error[T0206]: state `Release` has no way out
+  --> tests/fixtures/errors/T0206_dead_end_state.tejun:21:11
+   |
+21 |     state Release { clamp.retract within 2 s else fault RELEASE_TIMEOUT }
+   |           ^^^^^^^ dead end
+   |
+   = help: add a transition, e.g. `-> Idle`; otherwise only a fault or E-stop can leave this state
+   = 日本語: 状態 `Release` から抜け出す遷移がありません

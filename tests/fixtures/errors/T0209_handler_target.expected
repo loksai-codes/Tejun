@@ -1,0 +1,8 @@
+error[T0209]: handler goes to `Idle` instead of `Stopped`
+  --> tests/fixtures/errors/T0209_handler_target.tejun:23:38
+   |
+23 |   on fault        { outputs safe; -> Idle }
+   |                                      ^^^^ should be `Stopped`
+   |
+   = help: fault and E-stop handlers must stop the machine with `-> Stopped`; restarting is a separate, deliberate step
+   = 日本語: ハンドラが `Stopped` ではなく `Idle` に遷移しています

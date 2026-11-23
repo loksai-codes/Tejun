@@ -1,0 +1,8 @@
+error[T0207]: `conveyor on` comes after a transition
+  --> tests/fixtures/errors/T0207_after_transition.tejun:18:57
+   |
+18 |     state Idle    { when part_present forever -> Clamp; conveyor on }
+   |                                                         ^^^^^^^^^^^ after a transition
+   |
+   = help: write outputs and the step first, then the transitions
+   = 日本語: `conveyor on` が遷移の後に書かれています

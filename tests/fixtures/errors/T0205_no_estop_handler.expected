@@ -1,0 +1,8 @@
+error[T0205]: station `Demo` has no E-stop handler
+ --> tests/fixtures/errors/T0205_no_estop_handler.tejun:2:9
+  |
+2 | station Demo "デモ" {
+  |         ^^^^ no E-stop handler
+  |
+  = help: add `on not estop_ok { outputs safe; -> Stopped }`
+  = 日本語: ステーション `Demo` に非常停止ハンドラがありません
