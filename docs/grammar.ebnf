@@ -64,7 +64,10 @@ device_arg   = IDENT ":" IDENT ;
 (* ===== Interlocks ===== *)
 
 (* The "requires" form is recognised by looking one token past the first
-   IDENT; otherwise the line is a condition interlock. *)
+   IDENT; otherwise the line is a condition interlock.
+   checker: "never" and "requires" are proved before the program runs
+   (T0203); a condition interlock is a runtime monitor that raises its
+   fault, because it depends on sensor values no proof can rule out. *)
 interlock    = "interlock"
                ( "never" expr                          (* expr must never hold *)
                | IDENT "requires" expr                 (* output may be ON only while expr holds *)

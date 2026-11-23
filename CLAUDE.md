@@ -1,15 +1,21 @@
 # Tejun (手順) — project guide for Claude Code
 
 ## Current state (as of 2026-11-23)
-Phase 3 done (`BUILD_PROMPTS.md` has the phase plan).
+Phase 4 done in code (`BUILD_PROMPTS.md` has the phase plan).
 - Phase 1: npm-workspaces monorepo, strict TypeScript, Vitest, GitHub Actions CI;
   `examples/` (press_feeder, conveyor_sorter, pick_place); `docs/grammar.ebnf`.
 - Phase 2: lexer, parser, AST, diagnostics; syntax codes T0001–T0016; `tejun check <file>`.
-- Phase 3: checker (`packages/compiler/src/checker/`) with T0101–T0106, T0201–T0209
-  (T0203 reserved for Phase 4), T0301–T0306, T0401–T0406; state-graph IR (`ir.ts`)
-  with golden JSON per example in `tests/golden/`.
-- `tejun build|run` still print "not implemented yet".
-- Next: Phase 4 (interlock proof T0203, Structured Text codegen, `tejun build`).
+- Phase 3: checker (`packages/compiler/src/checker/`) with T0101–T0107, T0201–T0209,
+  T0301–T0306, T0401–T0406; state-graph IR (`ir.ts`) with golden JSON per example.
+- Phase 4: interlock proof (T0203, T0210) in `checker/interlocks.ts`; Structured Text
+  generator `codegen/st.ts` with golden `.st` per example; `tejun build <file> [-o dir]`.
+  press_feeder and conveyor_sorter gained a `Home` state because the proof found
+  they ran the conveyor/belt before the cylinder was confirmed retracted.
+- Not yet verified: the generated `.st` compiling in OpenPLC (the user does this by
+  hand; matiec is not available in this environment). If it reports an error, fix
+  `codegen/st.ts` and regenerate the ST goldens on purpose.
+- `tejun run` still prints "not implemented yet".
+- Next: Phase 5 (runtime interpreter on the same IR, `tejun run`, equivalence test).
 - Not added yet: `docs/SPEC.md` (work from this file until it exists). No GitHub remote yet.
 Update this section as phases are completed.
 
@@ -50,6 +56,7 @@ station PressFeeder "プレス送り" {
   interlock conveyor requires clamp.retracted
   interlock press_force < 40 kN else fault OVERLOAD
   sequence main {
+    state Home    { clamp.retract within 2 s else fault HOME_TIMEOUT; -> Idle }
     state Idle    { conveyor on; when part_present forever -> Clamp }
     state Clamp   { clamp.extend within 2 s else fault CLAMP_TIMEOUT; -> Press }
     state Press   { hold 1500 ms; -> Release }
@@ -84,6 +91,8 @@ Rules agreed in Phase 3 (enforced by the checker):
 - Address clashes are exact duplicates only (`%IW0` vs `%IX0.x` overlap differs between tools).
 - Cylinder: actions `extend`/`retract`, states `extended`/`retracted`, all four
   parameters required. Definitions live in `device-kinds.ts`.
+- Signal and station names must be usable in Structured Text: no ST reserved words,
+  no `tj_` prefix (reserved for generated code), no names differing only in case (T0107).
 
 The grammar lives in `docs/grammar.ebnf`. If you change syntax, update the
 grammar, `docs/language-reference.md`, and the examples in the same change.
@@ -95,17 +104,25 @@ grammar, `docs/language-reference.md`, and the examples in the same change.
 - `packages/compiler/src/parser.ts` — hand-written recursive descent + Pratt for expressions. No parser generators.
 - `packages/compiler/src/ast.ts` — every node carries a source span (line, col, endLine, endCol)
 - `packages/compiler/src/checker/` — one file per check family: `names` (T0101–T0102),
-  `units` (T0104–T0106), `types` (T0103), `io` (T03xx), `devices` (T04xx), `states`
-  (T0207–T0208), `timeouts` (T0201), `reachability` (T0202, T0204–T0206, T0209);
-  `interlocks` comes in Phase 4. `context.ts` holds the symbol table and helpers;
-  `index.ts` runs the passes in order and sorts diagnostics by position.
+  `target` (T0107), `units` (T0104–T0106), `types` (T0103), `io` (T03xx), `devices`
+  (T04xx), `states` (T0207–T0208), `timeouts` (T0201), `reachability` (T0202,
+  T0204–T0206, T0209). `context.ts` holds the symbol table and helpers; `index.ts`
+  runs the passes in order and sorts diagnostics by position. `interlocks.ts`
+  (T0203, T0210) runs on the IR afterwards, only when everything else is clean.
 - `packages/compiler/src/ir.ts` — state graph built only from a clean program: per state,
   `outputs`, one optional `step` (device action with `drive`/`done`/timeout, or hold),
-  ordered `transitions`; device states stay high-level (`device_state`) for Phase 4.
+  ordered `transitions`; device states stay high-level (`device_state`).
   `outputsOn(state)` gives every output ON in a state.
 - `packages/compiler/src/device-kinds.ts` — built-in device kinds (only `Cylinder`)
-- `packages/compiler/src/api.ts` — public `tokenize`, `parse`, `check` (check returns `ir` when clean)
-- `packages/compiler/src/codegen/st.ts` — FUNCTION_BLOCK with a CASE state machine and TON timers
+- `packages/compiler/src/api.ts` — public `tokenize`, `parse`, `check` (returns `ir` when
+  clean, including the interlock proof), `build` (also returns `st`)
+- `packages/compiler/src/codegen/st.ts` — one file with FUNCTION_BLOCK `<Station>` (CASE state
+  machine, one `TON`, `tj_state`/`tj_fault` outputs, `tj_pos_<device>` tracked positions),
+  PROGRAM `<Station>Program` (binds `AT %IX…` addresses; `%IW` words are UINT scaled
+  0..65535 → declared range) and an OpenPLC `CONFIGURATION` (20 ms task). States, faults
+  and positions are integer literals with comments; every output is assigned exactly
+  once at the end of the block; generated names use the `tj_` prefix.
+- `packages/compiler/src/version.ts` — `VERSION`, used by the CLI and the ST header
 - `packages/compiler/src/diagnostics.ts` — Rust/Elm-style errors with codes, caret underline, help text, Japanese line
 - `packages/runtime/` — scan-cycle interpreter that reads the same IR as codegen
 - `packages/cli/` — `tejun check | build | run`
@@ -115,15 +132,23 @@ The interpreter and ST codegen MUST read the same IR so the simulator behaves
 exactly like the generated PLC code.
 
 ## Interlock checking
-Explore every reachable (state × input combination). Each input is free
-(true/false) each scan; timers are abstracted to done / not done. If any
-reachable combination violates an interlock, report the shortest path of
-states. Cap stations at ~10 inputs; emit a clear error above the cap.
-
-Device-state interlocks such as `conveyor requires clamp.retracted` must use the
-device position implied by its last completed action (confirmed by its feedback
-sensor), not the raw sensor as a free input; otherwise every state that runs the
-conveyor would be reported as a violation.
+Implemented in `checker/interlocks.ts`. Breadth-first search over configurations
+(state, step done or not, device positions), so the first violation found has the
+shortest path. Model, per scan:
+- Free inputs are true or false: bool inputs the logic reads, plus each distinct
+  comparison on a real input. At most 10 (T0210 above that).
+- The state's timer is done or not done.
+- Device positions are tracked, not read from sensors: "moving" while an action
+  runs, the action's position once its done sensor confirms, "unknown" at startup.
+  So a station whose first state needs a device position must home it first.
+- Runtime monitors (`<cond> else fault`) and E-stop handlers can stop the machine;
+  in `Stopped` every output is OFF.
+- Outputs are written at the end of the scan, so each interlock is checked against
+  the state a scan ends in together with the inputs that scan read.
+- A step completes in one scan; its transitions run from the next scan.
+`never` and `requires` are proved; `<cond> else fault` is a runtime monitor only.
+The ST generator follows exactly this scan order (see the header of `codegen/st.ts`);
+the Phase 5 interpreter must too.
 
 ## Diagnostics format
 ```
@@ -162,10 +187,16 @@ How diagnostics work in code:
 - `npx tejun ...` runs the compiled CLI; run `npm run build` first.
   The `bin` launcher `packages/cli/bin/tejun.js` is committed so npm can link it before a build.
 - CLI logic lives in `packages/cli/src/main.ts` as `runCli(argv, io?)` returning
-  `{ code, stdout, stderr }`, with file reads injected through `io` so tests never touch
-  the disk; `src/index.ts` only does process I/O. Keep it that way for testing.
-- `tejun check` exit codes: 0 OK, 1 the program has errors, 2 could not check
-  (usage error, unreadable file, internal error). Diagnostics go to stdout.
+  `{ code, stdout, stderr }`, with file reads, directory creation and writes injected
+  through `io` so tests never touch the disk; `src/index.ts` only does process I/O.
+  Keep it that way for testing.
+- `tejun build <file> [-o dir]` writes `<dir>/<name>.st` (default dir `out`, gitignored);
+  on errors it prints diagnostics like `tejun check` and writes nothing.
+- Exit codes: 0 OK, 1 the program has errors, 2 could not run (usage error,
+  unreadable/unwritable file, internal error). Diagnostics go to stdout.
+- To try generated code in OpenPLC: `npx tejun build examples/press_feeder.tejun`, then
+  upload `out/press_feeder.st` in OpenPLC Runtime (Programs → Upload Program). For
+  CODESYS, copy only the FUNCTION_BLOCK.
 - Allowed runtime dependencies: none in compiler/runtime. Playground may use Monaco and React.
 - Ask before adding any dependency.
 
@@ -181,6 +212,8 @@ How diagnostics work in code:
   (spans left out); regenerate the same way and review the state graph in the diff.
 - Every example in `examples/` must check clean, compile, and simulate in tests.
 - Golden-file tests for generated ST (`tests/golden/*.st`). Update goldens only on purpose, and say so.
+  `tests/st.test.ts` also checks for every example that each output is assigned exactly
+  once in the FUNCTION_BLOCK, that code outside comments is ASCII, and that blocks balance.
 - Run `npm test` before saying a task is done. Fix failures; don't skip tests.
 
 ## Working style
