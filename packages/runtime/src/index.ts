@@ -13,3 +13,13 @@ export {
   type ScanResult,
   type FaultCause,
 } from "./station.js";
+export { Plant, DEFAULT_TRAVEL_MS } from "./plant.js";
+export {
+  parseScenario,
+  parseTime,
+  formatScenarioErrors,
+  type Scenario,
+  type ScenarioSet,
+  type ScenarioFollow,
+  type ScenarioError,
+} from "./scenario.js";
