@@ -1,14 +1,13 @@
 # Tejun (手順) — project guide for Claude Code
 
 ## Current state (as of 2026-11-23)
-**No code exists yet.** The folder holds only planning documents:
-- `CLAUDE.md` — this file (the target architecture and rules below are the plan)
-- `BUILD_PROMPTS.md` — the phase-by-phase build plan (Phase 0–7), with the prompt to use for each phase
-
-Not yet created: `docs/SPEC.md`, `docs/grammar.ebnf`, `package.json`, `packages/`,
-`examples/`, `tests/`. Git is initialized (no commits yet). Next step is
-Phase 1 in `BUILD_PROMPTS.md` (monorepo setup + example programs).
-Until Phase 1 is done, the commands under "Tech and commands" will not work.
+Phase 1 in progress (`BUILD_PROMPTS.md` has the phase plan).
+- Done: npm-workspaces monorepo (`packages/compiler`, `packages/runtime`,
+  `packages/cli`), strict TypeScript, Vitest smoke test, GitHub Actions CI.
+  The packages are placeholders; `tejun check|build|run` print "not implemented yet".
+- Next: example programs in `examples/` (reviewed by the user before the
+  grammar), then `docs/grammar.ebnf`.
+- Not added yet: `docs/SPEC.md` (work from this file until it exists). No GitHub remote yet.
 Update this section as phases are completed.
 
 ## What this project is
@@ -99,9 +98,16 @@ Codes: T00xx syntax, T01xx names/types/units, T02xx safety (interlocks,
 timeouts, reachability), T03xx I/O, T04xx devices. Never print a raw stack
 trace to the user.
 
-## Tech and commands (planned — set up in Phase 1)
-- TypeScript (strict), Node 20+, npm workspaces, Vitest
-- `npm install` · `npm test` · `npm run build` · `npx tejun check examples/press_feeder.tejun`
+## Tech and commands
+- TypeScript (strict, ESM, `NodeNext` modules: relative imports end in `.js`),
+  Node 22+, npm workspaces, Vitest. CI runs on Node 22 and 24.
+- Dev dependencies (exact versions pinned): `typescript`, `vitest`, `@types/node`.
+- `npm install` · `npm run build` (`tsc -b`) · `npm test` (Vitest, imports packages
+  from source, no build needed) · `npm run typecheck` (build + type-check tests)
+- `npx tejun ...` runs the compiled CLI; run `npm run build` first.
+  The `bin` launcher `packages/cli/bin/tejun.js` is committed so npm can link it before a build.
+- CLI logic lives in `packages/cli/src/main.ts` as a pure `runCli(argv)` returning
+  `{ code, stdout, stderr }`; `src/index.ts` only does process I/O. Keep it that way for testing.
 - Allowed runtime dependencies: none in compiler/runtime. Playground may use Monaco and React.
 - Ask before adding any dependency.
 

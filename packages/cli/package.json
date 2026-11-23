@@ -1,0 +1,22 @@
+{
+  "name": "@tejun/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/main.js",
+  "types": "./dist/main.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "default": "./dist/main.js"
+    }
+  },
+  "bin": {
+    "tejun": "./bin/tejun.js"
+  },
+  "files": ["bin", "dist"],
+  "dependencies": {
+    "@tejun/compiler": "0.0.0",
+    "@tejun/runtime": "0.0.0"
+  }
+}

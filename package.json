@@ -1,0 +1,28 @@
+{
+  "name": "tejun",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tejun (手順): a safety-checked language for programming one factory machine station, compiling to IEC 61131-3 Structured Text.",
+  "type": "module",
+  "workspaces": [
+    "packages/compiler",
+    "packages/runtime",
+    "packages/cli"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "typecheck": "tsc -b && tsc -p tests --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@tejun/cli": "0.0.0",
+    "@types/node": "22.20.5",
+    "typescript": "7.0.2",
+    "vitest": "5.1.1"
+  }
+}
