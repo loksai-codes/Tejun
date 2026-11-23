@@ -40,21 +40,22 @@ io_block     = "io" "{" { io_decl } "}" ;
 
 io_decl      = direction IDENT ":" type "@" ADDRESS
                [ STRING ]                    (* label, usually Japanese *)
-               [ "safety" ]                  (* checker: T03xx, safety signals stay out of normal logic *)
+               [ "safety" ]                  (* checker: bool inputs only (T0306); not used in states (T0305) *)
                [ range ] ;
 
 direction    = "input" | "output" ;
 
 type         = "bool"
-             | "real" [ "<" IDENT ">" ] ;    (* unit, e.g. real<kN>; checker: known unit, T01xx *)
+             | "real" [ "<" IDENT ">" ] ;    (* unit, e.g. real<kN>; checker: known unit, T0105 *)
 
 range        = "range" NUMBER ".." NUMBER ;
 
 
 (* ===== Devices ===== *)
 
-(* checker: device kind exists (only Cylinder for now) and every
-   parameter is wired to a signal of the right direction, T04xx. *)
+(* checker: device kind exists (only Cylinder for now), T0401; every
+   parameter is given once and wired to a signal of the right direction,
+   T0402-T0404. *)
 device_decl  = "device" IDENT ":" IDENT "(" device_arg { "," device_arg } ")" ;
 
 device_arg   = IDENT ":" IDENT ;
@@ -75,6 +76,12 @@ interlock    = "interlock"
 
 sequence     = "sequence" IDENT "{" state { state } "}" ;
 
+(* checker rules for the statements of a state:
+     - at most one step (device_action or hold), T0208
+     - transitions (when, goto) come after the outputs and the step, and
+       nothing follows a bare goto, T0207
+   So a state means: its outputs, plus its step's drive output, are ON for
+   the whole state; the step runs; then the transitions are tried in order. *)
 state        = "state" IDENT "{" [ statement { ";" statement } [ ";" ] ] "}" ;
 
 statement    = output_on
@@ -88,13 +95,13 @@ statement    = output_on
 output_on    = IDENT "on" ;
 
 (* e.g. clamp.extend within 2 s else fault CLAMP_TIMEOUT *)
-device_action = IDENT "." IDENT [ timeout ] ;   (* checker: timeout required, T02xx *)
+device_action = IDENT "." IDENT [ timeout ] ;   (* checker: timeout required, T0201 *)
 
 hold         = "hold" duration ;
 
 (* Transitions are tried top to bottom; the first true one is taken.
    A "when" followed later in the state by a bare goto is a branch and needs
-   no timeout. A "when" that can wait needs a timeout (checker: T02xx). *)
+   no timeout. A "when" that can wait needs a timeout (checker: T0201). *)
 when         = "when" expr [ timeout ] "->" IDENT ;
 
 goto         = "->" IDENT ;
@@ -102,7 +109,7 @@ goto         = "->" IDENT ;
 timeout      = "within" duration "else" "fault" IDENT
              | "forever" ;
 
-duration     = NUMBER IDENT ;                   (* checker: unit is ms or s, T01xx *)
+duration     = NUMBER IDENT ;                   (* checker: unit is ms or s, T0104/T0105 *)
 
 
 (* ===== Fault and E-stop handlers ===== *)
@@ -128,7 +135,7 @@ operand      = quantity
              | IDENT [ "." IDENT ]               (* signal, or device state such as clamp.retracted *)
              | "(" expr ")" ;
 
-quantity     = NUMBER [ IDENT ] ;                (* e.g. 40 kN; checker: unit matches, T01xx *)
+quantity     = NUMBER [ IDENT ] ;                (* e.g. 40 kN; checker: unit matches, T0104 *)
 
 
 (* ===== Lexical structure ===== *)
