@@ -13,3 +13,18 @@ export {
 export { KEYWORDS, type Token, type TokenKind } from "./lexer.js";
 export { tokenize, parse, check, type ParseResult, type CheckResult } from "./api.js";
 export type * as AST from "./ast.js";
+export {
+  buildIR,
+  outputsOn,
+  type StationIR,
+  type SignalIR,
+  type DeviceIR,
+  type InterlockIR,
+  type StateIR,
+  type StepIR,
+  type TransitionIR,
+  type TimeoutIR,
+  type HandlersIR,
+  type ExprIR,
+} from "./ir.js";
+export { DEVICE_KINDS, CYLINDER, type DeviceKind } from "./device-kinds.js";

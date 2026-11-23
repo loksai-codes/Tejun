@@ -4,6 +4,7 @@
 import type { Program } from "./ast.js";
 import { runChecker } from "./checker/index.js";
 import { DiagnosticAbort, type Diagnostic } from "./diagnostics.js";
+import { buildIR, type StationIR } from "./ir.js";
 import { lexAll, type Token } from "./lexer.js";
 import { Parser } from "./parser.js";
 import { SourceFile } from "./source.js";
@@ -36,6 +37,8 @@ export function parse(source: SourceFile): ParseResult {
 
 export interface CheckResult extends ParseResult {
   source: SourceFile;
+  /** The state-graph IR; present only when there are no diagnostics. */
+  ir?: StationIR;
 }
 
 /** Check a program: everything `tejun check` does. Parse, then run the checker. */
@@ -43,5 +46,7 @@ export function check(path: string, text: string): CheckResult {
   const source = new SourceFile(path, text);
   const parsed = parse(source);
   if (!parsed.program) return { source, ...parsed };
-  return { source, program: parsed.program, diagnostics: runChecker(source, parsed.program) };
+  const diagnostics = runChecker(source, parsed.program);
+  if (diagnostics.length > 0) return { source, program: parsed.program, diagnostics };
+  return { source, program: parsed.program, diagnostics, ir: buildIR(parsed.program) };
 }

@@ -1,0 +1,226 @@
+{
+  "name": "PressFeeder",
+  "label": "プレス送り",
+  "signals": [
+    {
+      "name": "part_present",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.0",
+      "label": "ワーク検出",
+      "safety": false
+    },
+    {
+      "name": "clamp_ext_ls",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.1",
+      "label": "クランプ前進端",
+      "safety": false
+    },
+    {
+      "name": "clamp_ret_ls",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.2",
+      "label": "クランプ後退端",
+      "safety": false
+    },
+    {
+      "name": "estop_ok",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.7",
+      "label": "非常停止OK",
+      "safety": true
+    },
+    {
+      "name": "clamp_out",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.0",
+      "label": "クランプ前進",
+      "safety": false
+    },
+    {
+      "name": "clamp_in",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.1",
+      "label": "クランプ後退",
+      "safety": false
+    },
+    {
+      "name": "conveyor",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.2",
+      "label": "搬送コンベア",
+      "safety": false
+    },
+    {
+      "name": "press_force",
+      "direction": "input",
+      "type": "real",
+      "unit": "kN",
+      "address": "%IW2",
+      "label": "プレス荷重",
+      "safety": false,
+      "range": {
+        "min": 0,
+        "max": 50
+      }
+    }
+  ],
+  "devices": [
+    {
+      "name": "clamp",
+      "kind": "Cylinder",
+      "wiring": {
+        "extend": "clamp_out",
+        "retract": "clamp_in",
+        "at_ext": "clamp_ext_ls",
+        "at_ret": "clamp_ret_ls"
+      }
+    }
+  ],
+  "interlocks": [
+    {
+      "kind": "never",
+      "condition": {
+        "kind": "and",
+        "left": {
+          "kind": "signal",
+          "name": "clamp_out"
+        },
+        "right": {
+          "kind": "signal",
+          "name": "clamp_in"
+        }
+      }
+    },
+    {
+      "kind": "requires",
+      "output": "conveyor",
+      "condition": {
+        "kind": "device_state",
+        "device": "clamp",
+        "state": "retracted",
+        "sensor": "clamp_ret_ls"
+      }
+    },
+    {
+      "kind": "condition",
+      "condition": {
+        "kind": "compare",
+        "op": "<",
+        "left": {
+          "kind": "signal",
+          "name": "press_force"
+        },
+        "right": {
+          "kind": "number",
+          "value": 40,
+          "unit": "kN"
+        }
+      },
+      "fault": "OVERLOAD"
+    }
+  ],
+  "initialState": "Idle",
+  "states": [
+    {
+      "name": "Idle",
+      "outputs": [
+        "conveyor"
+      ],
+      "transitions": [
+        {
+          "condition": {
+            "kind": "signal",
+            "name": "part_present"
+          },
+          "target": "Clamp",
+          "timeout": {
+            "kind": "forever"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Clamp",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "clamp",
+        "action": "extend",
+        "drive": "clamp_out",
+        "done": "clamp_ext_ls",
+        "timeout": {
+          "kind": "within",
+          "ms": 2000,
+          "fault": "CLAMP_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Press"
+        }
+      ]
+    },
+    {
+      "name": "Press",
+      "outputs": [],
+      "step": {
+        "kind": "hold",
+        "ms": 1500
+      },
+      "transitions": [
+        {
+          "target": "Release"
+        }
+      ]
+    },
+    {
+      "name": "Release",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "clamp",
+        "action": "retract",
+        "drive": "clamp_in",
+        "done": "clamp_ret_ls",
+        "timeout": {
+          "kind": "within",
+          "ms": 2000,
+          "fault": "RELEASE_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Idle"
+        }
+      ]
+    }
+  ],
+  "faults": [
+    "OVERLOAD",
+    "CLAMP_TIMEOUT",
+    "RELEASE_TIMEOUT"
+  ],
+  "handlers": {
+    "onFault": "Stopped",
+    "conditions": [
+      {
+        "condition": {
+          "kind": "not",
+          "operand": {
+            "kind": "signal",
+            "name": "estop_ok"
+          }
+        },
+        "target": "Stopped"
+      }
+    ]
+  }
+}

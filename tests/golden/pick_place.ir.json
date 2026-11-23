@@ -1,0 +1,361 @@
+{
+  "name": "PickPlace",
+  "label": "ピック&プレース",
+  "signals": [
+    {
+      "name": "part_ready",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.0",
+      "label": "供給位置ワーク有",
+      "safety": false
+    },
+    {
+      "name": "z_down_ls",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.1",
+      "label": "Z下降端",
+      "safety": false
+    },
+    {
+      "name": "z_up_ls",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.2",
+      "label": "Z上昇端",
+      "safety": false
+    },
+    {
+      "name": "x_out_ls",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.3",
+      "label": "X前進端",
+      "safety": false
+    },
+    {
+      "name": "x_home_ls",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.4",
+      "label": "X原点",
+      "safety": false
+    },
+    {
+      "name": "vacuum_ok",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.5",
+      "label": "真空確認",
+      "safety": false
+    },
+    {
+      "name": "estop_ok",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.7",
+      "label": "非常停止OK",
+      "safety": true
+    },
+    {
+      "name": "z_down",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.0",
+      "label": "Z下降",
+      "safety": false
+    },
+    {
+      "name": "z_up",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.1",
+      "label": "Z上昇",
+      "safety": false
+    },
+    {
+      "name": "x_out",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.2",
+      "label": "X前進",
+      "safety": false
+    },
+    {
+      "name": "x_home",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.3",
+      "label": "X後退",
+      "safety": false
+    },
+    {
+      "name": "vacuum",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.4",
+      "label": "真空",
+      "safety": false
+    }
+  ],
+  "devices": [
+    {
+      "name": "z",
+      "kind": "Cylinder",
+      "wiring": {
+        "extend": "z_down",
+        "retract": "z_up",
+        "at_ext": "z_down_ls",
+        "at_ret": "z_up_ls"
+      }
+    },
+    {
+      "name": "x",
+      "kind": "Cylinder",
+      "wiring": {
+        "extend": "x_out",
+        "retract": "x_home",
+        "at_ext": "x_out_ls",
+        "at_ret": "x_home_ls"
+      }
+    }
+  ],
+  "interlocks": [
+    {
+      "kind": "requires",
+      "output": "x_out",
+      "condition": {
+        "kind": "device_state",
+        "device": "z",
+        "state": "retracted",
+        "sensor": "z_up_ls"
+      }
+    },
+    {
+      "kind": "requires",
+      "output": "x_home",
+      "condition": {
+        "kind": "device_state",
+        "device": "z",
+        "state": "retracted",
+        "sensor": "z_up_ls"
+      }
+    }
+  ],
+  "initialState": "Wait",
+  "states": [
+    {
+      "name": "Wait",
+      "outputs": [],
+      "transitions": [
+        {
+          "condition": {
+            "kind": "signal",
+            "name": "part_ready"
+          },
+          "target": "Pick",
+          "timeout": {
+            "kind": "forever"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pick",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "z",
+        "action": "extend",
+        "drive": "z_down",
+        "done": "z_down_ls",
+        "timeout": {
+          "kind": "within",
+          "ms": 1000,
+          "fault": "Z_DOWN_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Grip"
+        }
+      ]
+    },
+    {
+      "name": "Grip",
+      "outputs": [
+        "vacuum"
+      ],
+      "transitions": [
+        {
+          "condition": {
+            "kind": "signal",
+            "name": "vacuum_ok"
+          },
+          "target": "Lift",
+          "timeout": {
+            "kind": "within",
+            "ms": 500,
+            "fault": "NO_VACUUM"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lift",
+      "outputs": [
+        "vacuum"
+      ],
+      "step": {
+        "kind": "device",
+        "device": "z",
+        "action": "retract",
+        "drive": "z_up",
+        "done": "z_up_ls",
+        "timeout": {
+          "kind": "within",
+          "ms": 1000,
+          "fault": "Z_UP_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Carry"
+        }
+      ]
+    },
+    {
+      "name": "Carry",
+      "outputs": [
+        "vacuum"
+      ],
+      "step": {
+        "kind": "device",
+        "device": "x",
+        "action": "extend",
+        "drive": "x_out",
+        "done": "x_out_ls",
+        "timeout": {
+          "kind": "within",
+          "ms": 2000,
+          "fault": "X_OUT_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Place"
+        }
+      ]
+    },
+    {
+      "name": "Place",
+      "outputs": [
+        "vacuum"
+      ],
+      "step": {
+        "kind": "device",
+        "device": "z",
+        "action": "extend",
+        "drive": "z_down",
+        "done": "z_down_ls",
+        "timeout": {
+          "kind": "within",
+          "ms": 1000,
+          "fault": "Z_DOWN_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Drop"
+        }
+      ]
+    },
+    {
+      "name": "Drop",
+      "outputs": [],
+      "transitions": [
+        {
+          "condition": {
+            "kind": "not",
+            "operand": {
+              "kind": "signal",
+              "name": "vacuum_ok"
+            }
+          },
+          "target": "Rise",
+          "timeout": {
+            "kind": "within",
+            "ms": 500,
+            "fault": "VACUUM_STUCK"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rise",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "z",
+        "action": "retract",
+        "drive": "z_up",
+        "done": "z_up_ls",
+        "timeout": {
+          "kind": "within",
+          "ms": 1000,
+          "fault": "Z_UP_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Return"
+        }
+      ]
+    },
+    {
+      "name": "Return",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "x",
+        "action": "retract",
+        "drive": "x_home",
+        "done": "x_home_ls",
+        "timeout": {
+          "kind": "within",
+          "ms": 2000,
+          "fault": "X_HOME_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Wait"
+        }
+      ]
+    }
+  ],
+  "faults": [
+    "Z_DOWN_TIMEOUT",
+    "NO_VACUUM",
+    "Z_UP_TIMEOUT",
+    "X_OUT_TIMEOUT",
+    "VACUUM_STUCK",
+    "X_HOME_TIMEOUT"
+  ],
+  "handlers": {
+    "onFault": "Stopped",
+    "conditions": [
+      {
+        "condition": {
+          "kind": "not",
+          "operand": {
+            "kind": "signal",
+            "name": "estop_ok"
+          }
+        },
+        "target": "Stopped"
+      }
+    ]
+  }
+}

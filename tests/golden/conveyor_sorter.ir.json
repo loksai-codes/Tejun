@@ -1,0 +1,235 @@
+{
+  "name": "ConveyorSorter",
+  "label": "コンベア仕分け",
+  "signals": [
+    {
+      "name": "part_at_gate",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.0",
+      "label": "ゲート前ワーク検出",
+      "safety": false
+    },
+    {
+      "name": "metal_sensor",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.1",
+      "label": "金属センサ",
+      "safety": false
+    },
+    {
+      "name": "pusher_ext_ls",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.2",
+      "label": "プッシャ前進端",
+      "safety": false
+    },
+    {
+      "name": "pusher_ret_ls",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.3",
+      "label": "プッシャ後退端",
+      "safety": false
+    },
+    {
+      "name": "exit_eye",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.4",
+      "label": "排出センサ",
+      "safety": false
+    },
+    {
+      "name": "estop_ok",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.7",
+      "label": "非常停止OK",
+      "safety": true
+    },
+    {
+      "name": "belt",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.0",
+      "label": "ベルト",
+      "safety": false
+    },
+    {
+      "name": "pusher_out",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.1",
+      "label": "プッシャ前進",
+      "safety": false
+    },
+    {
+      "name": "pusher_in",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.2",
+      "label": "プッシャ後退",
+      "safety": false
+    }
+  ],
+  "devices": [
+    {
+      "name": "pusher",
+      "kind": "Cylinder",
+      "wiring": {
+        "extend": "pusher_out",
+        "retract": "pusher_in",
+        "at_ext": "pusher_ext_ls",
+        "at_ret": "pusher_ret_ls"
+      }
+    }
+  ],
+  "interlocks": [
+    {
+      "kind": "never",
+      "condition": {
+        "kind": "and",
+        "left": {
+          "kind": "signal",
+          "name": "belt"
+        },
+        "right": {
+          "kind": "signal",
+          "name": "pusher_out"
+        }
+      }
+    },
+    {
+      "kind": "requires",
+      "output": "belt",
+      "condition": {
+        "kind": "device_state",
+        "device": "pusher",
+        "state": "retracted",
+        "sensor": "pusher_ret_ls"
+      }
+    }
+  ],
+  "initialState": "Run",
+  "states": [
+    {
+      "name": "Run",
+      "outputs": [
+        "belt"
+      ],
+      "transitions": [
+        {
+          "condition": {
+            "kind": "signal",
+            "name": "part_at_gate"
+          },
+          "target": "Sense",
+          "timeout": {
+            "kind": "forever"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sense",
+      "outputs": [],
+      "transitions": [
+        {
+          "condition": {
+            "kind": "signal",
+            "name": "metal_sensor"
+          },
+          "target": "Push"
+        },
+        {
+          "target": "Pass"
+        }
+      ]
+    },
+    {
+      "name": "Push",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "pusher",
+        "action": "extend",
+        "drive": "pusher_out",
+        "done": "pusher_ext_ls",
+        "timeout": {
+          "kind": "within",
+          "ms": 1500,
+          "fault": "PUSH_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Back"
+        }
+      ]
+    },
+    {
+      "name": "Back",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "pusher",
+        "action": "retract",
+        "drive": "pusher_in",
+        "done": "pusher_ret_ls",
+        "timeout": {
+          "kind": "within",
+          "ms": 1500,
+          "fault": "BACK_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Run"
+        }
+      ]
+    },
+    {
+      "name": "Pass",
+      "outputs": [
+        "belt"
+      ],
+      "transitions": [
+        {
+          "condition": {
+            "kind": "signal",
+            "name": "exit_eye"
+          },
+          "target": "Run",
+          "timeout": {
+            "kind": "within",
+            "ms": 5000,
+            "fault": "EXIT_JAM"
+          }
+        }
+      ]
+    }
+  ],
+  "faults": [
+    "PUSH_TIMEOUT",
+    "BACK_TIMEOUT",
+    "EXIT_JAM"
+  ],
+  "handlers": {
+    "onFault": "Stopped",
+    "conditions": [
+      {
+        "condition": {
+          "kind": "not",
+          "operand": {
+            "kind": "signal",
+            "name": "estop_ok"
+          }
+        },
+        "target": "Stopped"
+      }
+    ]
+  }
+}
