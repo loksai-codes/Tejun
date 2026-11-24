@@ -20,3 +20,33 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build:playground
+
+  # Regenerate the Structured Text for every example and compile it with
+  # matiec (iec2c, the OpenPLC compiler), then compile matiec's C output with
+  # gcc. Fails if either step fails. See docs/plc-verification.md.
+  plc-compile:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Install matiec build tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq build-essential bison flex autoconf automake
+      - name: Cache matiec
+        uses: actions/cache@v4
+        with:
+          path: ~/matiec
+          key: matiec-${{ runner.os }}-ubuntu-24.04-${{ hashFiles('scripts/build-matiec.sh') }}
+      - name: Build matiec
+        run: bash scripts/build-matiec.sh ~/matiec
+      - name: Generate Structured Text for every example
+        run: |
+          for f in examples/*.tejun; do
+            npx tejun build "$f" -o out/st
+          done
+      - name: Compile with matiec and gcc
+        run: bash scripts/matiec-check.sh ~/matiec out/st
