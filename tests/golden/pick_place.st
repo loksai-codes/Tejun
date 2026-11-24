@@ -187,6 +187,8 @@ PROGRAM PickPlaceProgram
     x_out AT %QX0.2 : BOOL; (* X前進 *)
     x_home AT %QX0.3 : BOOL; (* X後退 *)
     vacuum AT %QX0.4 : BOOL; (* 真空 *)
+  END_VAR
+  VAR
     tj_station : PickPlace;
   END_VAR
   tj_station(

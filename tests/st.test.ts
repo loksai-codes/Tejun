@@ -59,6 +59,20 @@ describe("Structured Text structure", () => {
     expect(count(/\bFUNCTION_BLOCK\b/g)).toBe(count(/\bEND_FUNCTION_BLOCK\b/g));
   });
 
+  // Regression: matiec (OpenPLC) failed with "invalid located variable
+  // declaration" when `AT %…` variables and ordinary ones shared a VAR block.
+  // IEC 61131-3 keeps located_var_declarations in their own block.
+  it.each(examples)("%s: located (AT) and ordinary variables never share a VAR block", (file) => {
+    const code = stOf(file).replace(/\(\*[\s\S]*?\*\)/g, "");
+    const blocks = [...code.matchAll(/^\s*VAR\s*$([\s\S]*?)^\s*END_VAR\s*$/gm)].map((m) => m[1]!);
+    expect(blocks.length).toBeGreaterThan(0);
+    for (const block of blocks) {
+      const decls = block.split("\n").filter((l) => l.includes(":"));
+      const located = decls.filter((l) => /\bAT\s+%/.test(l));
+      expect(located.length === 0 || located.length === decls.length, block).toBe(true);
+    }
+  });
+
   it("is not generated when the program has errors", () => {
     const text = readFileSync(new URL("press_feeder.tejun", examplesDir), "utf8");
     const result = build("x.tejun", text.replace(/^\s*state Home.*\n/m, ""));

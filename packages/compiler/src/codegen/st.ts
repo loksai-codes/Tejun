@@ -285,6 +285,8 @@ class Generator {
     const raw = (name: string) => `tj_raw_${name}`;
     this.line(`PROGRAM ${ir.name}Program`);
     this.block(() => {
+      // IEC 61131-3 keeps located variables (`AT %…`) and ordinary variables
+      // in separate VAR blocks; matiec (OpenPLC) rejects a mixed block.
       this.line("VAR");
       this.block(() => {
         for (const s of ir.signals) {
@@ -294,8 +296,10 @@ class Generator {
             this.line(`${raw(s.name)} AT ${s.address} : UINT; (* ${s.name}, raw 0..${RAW_MAX} *)`);
           }
         }
-        this.line(`tj_station : ${ir.name};`);
       });
+      this.line("END_VAR");
+      this.line("VAR");
+      this.block(() => this.line(`tj_station : ${ir.name};`));
       this.line("END_VAR");
       const inputs = ir.signals.filter((s) => s.direction === "input");
       this.line("tj_station(");

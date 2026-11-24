@@ -133,6 +133,8 @@ PROGRAM PressFeederProgram
     clamp_in AT %QX0.1 : BOOL; (* クランプ後退 *)
     conveyor AT %QX0.2 : BOOL; (* 搬送コンベア *)
     tj_raw_press_force AT %IW2 : UINT; (* press_force, raw 0..65535 *)
+  END_VAR
+  VAR
     tj_station : PressFeeder;
   END_VAR
   tj_station(

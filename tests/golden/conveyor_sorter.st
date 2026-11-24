@@ -134,6 +134,8 @@ PROGRAM ConveyorSorterProgram
     belt AT %QX0.0 : BOOL; (* ベルト *)
     pusher_out AT %QX0.1 : BOOL; (* プッシャ前進 *)
     pusher_in AT %QX0.2 : BOOL; (* プッシャ後退 *)
+  END_VAR
+  VAR
     tj_station : ConveyorSorter;
   END_VAR
   tj_station(
