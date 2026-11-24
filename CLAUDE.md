@@ -15,7 +15,7 @@ Phase 7 docs done (`BUILD_PROMPTS.md` has the phase plan).
   matiec (OpenPLC's `iec2c`, fork `thiagoralves/matiec` pinned in `scripts/build-matiec.sh`)
   and gcc compiles matiec's C output. It first failed: `AT` variables and `tj_station`
   shared a `VAR` block (fixed; regression test in `tests/st.test.ts`). CI job `plc-compile`
-  runs it on every push (not yet run: no remote). Details and logs: `docs/plc-verification.md`.
+  runs it on every push (green on GitHub since 2026-11-24). Details and logs: `docs/plc-verification.md`.
   Not verified: running inside OpenPLC Runtime; CODESYS / Sysmac Studio / GX Works3.
 - Position check (2026-11-24): built-in fault `POSITION_MISMATCH` (numbered after the program's faults) for
   every station with a device; generated ST and simulator agree scan by scan, including
@@ -35,18 +35,18 @@ Phase 7 docs done (`BUILD_PROMPTS.md` has the phase plan).
 - Phase 6: `packages/playground` (Vite + React + Monaco): live diagnostics, generic SVG
   station view, live simulator with jams, event log, ST and scenario tabs, EN/日本語.
   `.github/workflows/pages.yml` deploys it to GitHub Pages on push to `main`.
-- Not yet live: the Pages site (needs a GitHub remote with Pages set to "GitHub Actions").
+- Live: https://loksai-codes.github.io/Tejun/ (Pages enabled 2026-11-24, source "GitHub Actions";
+  the browser smoke test passes against the live site). Repo: github.com/loksai-codes/Tejun (public).
 - Known: `monaco-editor` pins DOMPurify 3.4.15, which `npm audit` flags as low severity
   (IN_PLACE / SAFE_FOR_TEMPLATES modes; Monaco only renders our own hover text). Revisit
   when Monaco ships a newer DOMPurify; don't force an override.
 - Phase 7 (docs): `README.md`, `docs/language-reference.md`, `docs/checks.md` (generated),
   `docs/for-ladder-engineers.md`; every README command verified from a fresh clone.
-  Still to fill in: the playground URL in the README (after the first Pages deploy) and
-  `docs/demo.gif` (a comment in the README marks the spot; `docs/playground.png` is a
+  Still to fill in: `docs/demo.gif` (a comment in the README marks the spot; `docs/playground.png` is a
   real screenshot from the browser smoke test).
 - Next: the optional AI front end (only if the user wants it), then the
   "Before you submit" judge check in `BUILD_PROMPTS.md`.
-- Not added yet: `docs/SPEC.md` (work from this file until it exists). No GitHub remote yet.
+- Not added yet: `docs/SPEC.md` (work from this file until it exists).
 Update this section as phases are completed.
 
 ## What this project is

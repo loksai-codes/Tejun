@@ -14,9 +14,9 @@ Japanese.
 <!-- Demo GIF goes here: docs/demo.gif (edit, see an error, run, jam a sensor). -->
 ![The Tejun playground: a press feeder stopped by CLAMP_TIMEOUT after its clamp sensor was jammed](docs/playground.png)
 
-**Playground:** the browser playground (editor with live errors, simulator, generated
-Structured Text) is published to GitHub Pages by the *Deploy playground* workflow;
-the link appears here after the first deploy. To run it locally: `npm run playground`.
+**Playground: <https://loksai-codes.github.io/Tejun/>** (editor with live errors,
+simulator, generated Structured Text; no install). It is redeployed on every push to
+`main` by the *Deploy playground* workflow. To run it locally: `npm run playground`.
 
 ## Quickstart
 
