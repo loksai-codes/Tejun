@@ -3,7 +3,7 @@
 ## Current state (as of 2026-11-23)
 Phase 7 docs done (`BUILD_PROMPTS.md` has the phase plan).
 - Phase 1: npm-workspaces monorepo, strict TypeScript, Vitest, GitHub Actions CI;
-  `examples/` (press_feeder, conveyor_sorter, pick_place); `docs/grammar.ebnf`.
+  `examples/` (press_feeder, conveyor_sorter, pick_place; press_station added later); `docs/grammar.ebnf`.
 - Phase 2: lexer, parser, AST, diagnostics; syntax codes T0001–T0016; `tejun check <file>`.
 - Phase 3: checker (`packages/compiler/src/checker/`) with T0101–T0107, T0201–T0209,
   T0301–T0306, T0401–T0406; state-graph IR (`ir.ts`) with golden JSON per example.
@@ -17,12 +17,18 @@ Phase 7 docs done (`BUILD_PROMPTS.md` has the phase plan).
   shared a `VAR` block (fixed; regression test in `tests/st.test.ts`). CI job `plc-compile`
   runs it on every push (not yet run: no remote). Details and logs: `docs/plc-verification.md`.
   Not verified: running inside OpenPLC Runtime; CODESYS / Sysmac Studio / GX Works3.
-- Position check (2026-11-24): built-in fault `POSITION_MISMATCH` (last fault number) for
+- Position check (2026-11-24): built-in fault `POSITION_MISMATCH` (numbered after the program's faults) for
   every station with a device; generated ST and simulator agree scan by scan, including
   sensors stuck ON/OFF and cylinders moved by hand (`Plant.moveByHand`). No new error code:
   T0102 reserves the name, T0204 requires `on fault` when a station has a device.
   `docs/model-assumptions.md` says what is proved vs guarded, and the known blind spots
   (e.g. homing onto a stuck-ON sensor; fixed 100 ms debounce).
+- Motor device kind (2026-11-24): `Motor(run, feedback)`, action `run` (start-feedback
+  timeout), states `running`/`stopped`; runs only in states whose step is `run`, then
+  `stopping` until feedback OFF. Built-in fault `FEEDBACK_MISMATCH`. No grammar change.
+  Fourth example `examples/press_station.tejun` (belt Motor + clamp and ram Cylinders).
+  Device kinds are data in `device-kinds.ts` (states = sensor + value, `release`,
+  `mismatchFault`); the checker, proof, IR, codegen, runtime and station view are generic.
 - Phase 5: `packages/runtime` (IR interpreter, simulated machine, scenarios, timeline);
   `tejun run`; each example has a `.scenario`; equivalence test proves the simulator
   matches the generated ST scan by scan.
@@ -99,7 +105,9 @@ Semantics agreed in Phase 1 (the grammar and examples follow them):
 - Outputs not switched `on` in a state are OFF in that state (there is no `off`).
 - `Stopped` is a built-in state; fault and E-stop handlers go there.
 - In `io` lines the label comes before `safety` / `range`.
-- Device kinds: only `Cylinder` (double-acting: extend, retract, at_ext, at_ret).
+- Device kinds: `Cylinder` (double-acting: extend, retract, at_ext, at_ret) and `Motor`
+  (run, feedback; action `run`, states `running`/`stopped`; runs only in the states
+  whose step is `run`, so it stops when such a state is left).
 
 Rules agreed in Phase 3 (enforced by the checker):
 - One step per state: at most one device action or `hold` (T0208).
@@ -114,14 +122,20 @@ Rules agreed in Phase 3 (enforced by the checker):
   `on fault { … }` (T0204); handlers must go to `Stopped` (T0209).
 - Address clashes are exact duplicates only (`%IW0` vs `%IX0.x` overlap differs between tools).
 - Cylinder: actions `extend`/`retract`, states `extended`/`retracted`, all four
-  parameters required. Definitions live in `device-kinds.ts`.
-- Position check (`device-kinds.ts`: `POSITION_MISMATCH`, `POSITION_DEBOUNCE_MS` = 100):
-  per device, mismatch = both end sensors ON, or tracked at an end whose sensor is OFF,
-  or moving away from an end (`tj_from_<device>`) whose sensor is still ON. Debounced by
-  one TON per device (`tj_mismatch_<device>`), checked in the monitor block after
-  `else fault` monitors and before E-stop handlers. It only stops the machine, so the
-  proof does not model it (E-stop already allows "stop in any scan"). The IR carries it
-  (`StationIR.positionCheck`, `DeviceIR.sensors`); codegen and runtime both read it.
+  parameters required. Motor: action `run`, states `running`/`stopped` (feedback ON/OFF),
+  both parameters required; `belt.stopped` needs feedback OFF after the run output dropped.
+  Definitions live in `device-kinds.ts`; a new kind should need only a definition there,
+  plus its picture in `StationView.tsx` and its simulation in `runtime/plant.ts`.
+- Device check (`device-kinds.ts`: each kind's `mismatchFault`, `MISMATCH_DEBOUNCE_MS` = 100):
+  per device, mismatch = two states on different sensors both hold (cylinder both ends ON),
+  or the tracked state's sensor says otherwise (end lost; motor feedback lost / ON while
+  stopped), or moving away from a state that still holds (`tj_from_<device>`, cylinders
+  only). Debounced by one TON per device (`tj_mismatch_<device>`), checked in the monitor
+  block after `else fault` monitors and before E-stop handlers; a motor's `stopping` ->
+  `stopped` confirmation runs first in that block. The check only stops the machine, so
+  the proof does not model it (E-stop already allows "stop in any scan"), but the proof
+  does model motor release (feedback is always a free input). The IR carries it
+  (`StationIR.deviceCheck`, `DeviceIR.states/release/mismatchFault`, `StepIR.target`).
 - Signal and station names must be usable in Structured Text: no ST reserved words,
   no `tj_` prefix (reserved for generated code), no names differing only in case (T0107).
 

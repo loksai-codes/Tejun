@@ -53,7 +53,7 @@ range        = "range" NUMBER ".." NUMBER ;
 
 (* ===== Devices ===== *)
 
-(* checker: device kind exists (only Cylinder for now), T0401; every
+(* checker: device kind exists (Cylinder or Motor), T0401; every
    parameter is given once and wired to a signal of the right direction,
    T0402-T0404. *)
 device_decl  = "device" IDENT ":" IDENT "(" device_arg { "," device_arg } ")" ;
@@ -169,7 +169,7 @@ bit          = "0".."7" ;
      interlock never requires else fault sequence state
      on hold when within forever outputs safe and or not
 
-   Units (ms, s, kN, N, ...) and device kinds (Cylinder) are ordinary
+   Units (ms, s, kN, N, ...) and device kinds (Cylinder, Motor) are ordinary
    identifiers checked by the checker, not keywords.
 
    Symbols:

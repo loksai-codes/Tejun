@@ -95,47 +95,72 @@ suggested).
 
 ## Devices
 
+A device is a contract between the program and a piece of the machine: the
+signals it is wired to, the actions a state can run, and the states a condition
+can test. Two kinds are built in, and they are written and checked the same way.
+
 ```text
 device clamp : Cylinder(extend: clamp_out, retract: clamp_in,
                         at_ext: clamp_ext_ls, at_ret: clamp_ret_ls)
+device belt  : Motor(run: belt_run, feedback: belt_fb)
 ```
 
-`Cylinder` is a double-acting pneumatic cylinder with a limit switch at each end.
-It is the only device kind for now.
-
-| Parameter | Wired to | Meaning |
+| | `Cylinder` | `Motor` |
 |---|---|---|
-| `extend` | bool output | valve output that extends the cylinder |
-| `retract` | bool output | valve output that retracts it |
-| `at_ext` | bool input | sensor confirming it is extended |
-| `at_ret` | bool input | sensor confirming it is retracted |
+| what it is | double-acting cylinder, a limit switch at each end | motor with a run output and a running feedback (a speed monitor: ON at speed, OFF at standstill) |
+| outputs | `extend`, `retract` | `run` |
+| inputs | `at_ext`, `at_ret` | `feedback` |
+| actions (a state's step) | `clamp.extend`, `clamp.retract` | `belt.run` |
+| action done when | that end's sensor is ON | `feedback` is ON |
+| states (in conditions) | `clamp.extended`, `clamp.retracted` | `belt.running`, `belt.stopped` |
+| in a state that does not act on it | holds its position | `run` is OFF: it is *stopping* until `feedback` goes OFF, then `stopped` |
+| built-in fault | `POSITION_MISMATCH` | `FEEDBACK_MISMATCH` |
 
-All four are required (T0402); each output may be driven by only one device
-parameter (T0406). A cylinder offers:
+Every parameter is required (T0402) and must be a bool signal of the right
+direction (T0404). An action takes a timeout like any wait (T0201):
 
-- actions, used as a state's step: `clamp.extend`, `clamp.retract`
-- states, used in conditions: `clamp.extended`, `clamp.retracted`
+```text
+state Clamp { clamp.extend within 2 s else fault CLAMP_TIMEOUT; -> Press }
+state Feed  { belt.run within 1 s else fault BELT_NO_START;
+              when part_at_stop within 10 s else fault FEED_TIMEOUT -> Settle }
+```
 
-A device owns its outputs: switching `clamp_out on` directly is a double coil
-and is rejected (T0406).
+For a motor, the timeout is the **start-feedback timeout**: `BELT_NO_START` is
+raised if `feedback` is not ON within 1 s of switching `run` on. The action's
+output stays ON for the whole state, including while its transitions wait, so
+the belt above keeps running until a part reaches the stop. A motor runs only in
+states whose step is its `run`; one step per state (T0208) means a state cannot
+run a motor and move a cylinder at the same time.
 
-### Position check
+A stopping motor may still be coasting, so `belt.stopped` is true only once the
+feedback has gone OFF. To wait for it, use the state in a transition:
 
-Tejun tracks each device's position from its confirmed actions (see
+```text
+state Settle { when belt.stopped within 2 s else fault BELT_NO_STOP -> Clamp }
+```
+
+A device owns its outputs: switching `clamp_out on` or `belt_run on` directly is
+a double coil and is rejected (T0406). Unknown actions and states, and an action
+used as a state or the other way round, are T0405.
+
+### Device check
+
+Tejun tracks each device's state from its confirmed actions (see
 [Interlocks](#interlocks)). At runtime, every scan, it also checks that the
-sensors agree with that tracked position. A device's sensors disagree when:
+sensors agree with that tracked state. They disagree when:
 
-- both end sensors are ON at once;
-- it is tracked at an end (`extended` or `retracted`) and that end's sensor is OFF,
-  for example because it was pushed by hand or the sensor failed;
-- it is moving away from an end and that end's sensor is still ON, for example
-  because the sensor is stuck ON.
+| | Cylinder | Motor |
+|---|---|---|
+| two states hold at once | both end sensors ON | (one sensor: cannot happen) |
+| tracked in a state its sensor contradicts | at an end whose sensor is OFF (pushed by hand, sensor failed) | `running` with `feedback` OFF (**feedback lost**), or `stopped` with `feedback` ON (started by itself, welded contactor) |
+| moving away from a state that still holds | the start end's sensor still ON (sensor stuck ON) | (not checked: starting is covered by the start timeout) |
 
-If a disagreement lasts 100 ms (the debounce time, fixed for now), the built-in
-fault `POSITION_MISMATCH` is raised: `on fault` runs and every output goes OFF in
-`Stopped`. So every station with a device needs `on fault` (T0204), and a program
-may not raise `POSITION_MISMATCH` itself (T0102). What this check covers, and what
-it cannot, is in [Model assumptions](model-assumptions.md).
+If a disagreement lasts 100 ms (the debounce time, fixed for now), the device's
+built-in fault is raised: `on fault` runs and every output goes OFF in
+`Stopped`. So every station with a device needs `on fault` (T0204), and a
+program may not raise `POSITION_MISMATCH` or `FEEDBACK_MISMATCH` itself (T0102).
+What this check covers, and what it cannot, is in
+[Model assumptions](model-assumptions.md).
 
 ## Interlocks
 
@@ -246,10 +271,11 @@ true/false (T0103); `<` and friends compare numbers with the same unit (T0104);
 The generated PLC code, the simulator and the interlock proof all follow the same
 order every scan:
 
-1. runtime monitors (`<cond> else fault`), the device position check, and
-   E-stop handlers
+1. a stopping motor whose feedback is OFF becomes `stopped`; then runtime
+   monitors (`<cond> else fault`), the device check, and E-stop handlers
 2. the current state: its step, or once the step is done its transitions
-3. entering a new state resets its step and timer, and marks a device moving
+3. entering a new state resets its step and timer, marks its device moving, and
+   starts stopping every motor it does not run
 4. every output is written once, from the state the scan ended in
 
 ## Tools

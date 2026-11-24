@@ -45,6 +45,7 @@ More commands:
 npx tejun check examples/press_feeder.tejun        # check: prints OK or the errors
 npx tejun build examples/press_feeder.tejun        # writes out/press_feeder.st
 npx tejun run examples/pick_place.tejun            # simulate with examples/pick_place.scenario
+npx tejun run examples/press_station.tejun         # a belt Motor and two Cylinders
 ```
 
 ## What a program looks like
@@ -97,13 +98,14 @@ error[T0203]: interlock violated: `conveyor` can be ON while `clamp.retracted` i
 
 **What is proven vs what is guarded at runtime.** The proof covers every possible
 sequence of input values, so a lying sensor cannot make the program break an
-interlock. But it reasons about each cylinder's *tracked* position (the end its
-last action confirmed), not where the cylinder physically is. Closing that gap is
-a runtime job: every scan, the generated code checks each cylinder's sensors
-against its tracked position. If they disagree for 100 ms (pushed by hand, a
-sensor stuck ON or OFF), it raises `POSITION_MISMATCH` and switches every output
-off. Timeouts, `else fault` monitors and the E-stop handler are runtime guards
-too. [Model assumptions](docs/model-assumptions.md) lists exactly what is proved,
+interlock. But it reasons about each device's *tracked* state (the end a
+cylinder's last action confirmed, or whether a motor's feedback confirmed it
+running or stopped), not the physical machine. Closing that gap is a runtime job:
+every scan, the generated code checks each device's sensors against its tracked
+state. If they disagree for 100 ms (a cylinder pushed by hand, a sensor stuck,
+a motor's feedback lost), it raises `POSITION_MISMATCH` or `FEEDBACK_MISMATCH`
+and switches every output off. Timeouts, `else fault` monitors and the E-stop
+handler are runtime guards too. [Model assumptions](docs/model-assumptions.md) lists exactly what is proved,
 what is guarded, and the cases neither can catch.
 
 ## How it works
@@ -148,7 +150,8 @@ flowchart LR
 ## Limitations
 
 - One station per program; no multi-station lines, PackML states or robot motion.
-- The only device kind is a double-acting `Cylinder`; real-valued outputs are not driven.
+- Two device kinds: a double-acting `Cylinder` and a `Motor` with a running feedback
+  ([language reference](docs/language-reference.md#devices)); real-valued outputs are not driven.
 - The interlock proof handles up to 10 free inputs per station.
 - Generated Structured Text is compiled with matiec, OpenPLC's compiler, on every push
   ([how, with logs](docs/plc-verification.md)). It has not been run inside OpenPLC Runtime,

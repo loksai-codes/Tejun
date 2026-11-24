@@ -57,7 +57,8 @@ directly, without Docker).
 
 ## Output
 
-The log from `bash scripts/matiec-docker.sh` on 24 Nov 2026 (exit code 0). The
+The log from `bash scripts/matiec-docker.sh` on 24 Nov 2026, after the Motor
+device kind and `examples/press_station.tejun` were added (exit code 0). The
 three `missing` / `configure` lines are printed by matiec's own build and are
 harmless.
 
@@ -65,6 +66,7 @@ harmless.
 wrote out/st/conveyor_sorter.st
 wrote out/st/pick_place.st
 wrote out/st/press_feeder.st
+wrote out/st/press_station.st
 /opt/matiec/config/missing: Unknown `--is-lightweight' option
 Try `/opt/matiec/config/missing --help' for more information
 configure: WARNING: 'missing' script is too old or missing
@@ -111,7 +113,20 @@ iec2c: OK
 $ gcc -c -I lib/C Config0.c Res0.c
 gcc:   OK (Config0.o Res0.o )
 
-OK: all 3 files compiled with matiec and gcc
+=== press_station.st
+$ iec2c -I lib -T press_station press_station.st
+POUS.c
+POUS.h
+LOCATED_VARIABLES.h
+VARIABLES.csv
+Config0.c
+Config0.h
+Res0.c
+iec2c: OK
+$ gcc -c -I lib/C Config0.c Res0.c
+gcc:   OK (Config0.o Res0.o )
+
+OK: all 4 files compiled with matiec and gcc
 ```
 
 ## The bug matiec found

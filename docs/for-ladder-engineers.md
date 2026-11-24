@@ -18,6 +18,7 @@ that OpenPLC or CODESYS can load.
 | on-delay timer (TON / オンディレイタイマ) | `hold 1500 ms`, or the timeout of a wait |
 | error-detection timer (異常検出タイマ) | `within 2 s else fault CLAMP_TIMEOUT` |
 | cylinder with two limit switches (シリンダ + リミットスイッチ) | `device clamp : Cylinder(extend:…, retract:…, at_ext:…, at_ret:…)` |
+| motor with a run contactor and a running feedback (モータ + 運転フィードバック) | `device belt : Motor(run:…, feedback:…)`; `belt.run within 1 s else fault BELT_NO_START` |
 | interlock contacts in series (インターロック接点) | `interlock conveyor requires clamp.retracted` — *proved*, not just wired |
 | origin return (原点復帰) | a `Home` state at the start of the sequence |
 | emergency stop circuit (非常停止回路) | a `safety` input and `on not estop_ok { outputs safe; -> Stopped }` |
@@ -105,13 +106,19 @@ Every cylinder also gets the position-abnormal alarm you would normally write by
 hand (シリンダ位置異常). If its sensors disagree with where the program last
 confirmed it for 100 ms, the station stops with `POSITION_MISMATCH`. That covers
 both sensors ON, the confirmed end's sensor going OFF (pushed by hand, sensor
-failed), and the start sensor staying ON after the valve switched. Details and
-limits: [Model assumptions](model-assumptions.md).
+failed), and the start sensor staying ON after the valve switched.
+
+Every motor gets the feedback alarm (運転フィードバック異常) the same way: the
+start-feedback timeout you write on `belt.run`, and `FEEDBACK_MISMATCH` when the
+feedback drops while running or comes on while stopped. A motor only counts as
+`belt.stopped` once its feedback has gone OFF, so an interlock such as
+`ram_down requires belt.stopped` also covers the coasting time after the contactor
+drops out. Details and limits: [Model assumptions](model-assumptions.md).
 
 ## Things to know
 
 - One station per file; multi-station lines are not supported yet.
-- The only device kind is the double-acting `Cylinder`.
+- Two device kinds: the double-acting `Cylinder` and the `Motor` with a running feedback.
 - Tejun does not produce ladder diagrams; it produces Structured Text.
 - Tejun is a development aid. It does not replace a certified safety PLC or a
   hard-wired emergency stop circuit, and makes no claim of safety certification.
