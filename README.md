@@ -5,9 +5,10 @@ catches the bugs that break machines before the code runs.** You describe the
 station's sensors, cylinders and outputs, the interlocks between them, and the
 sequence of steps. Tejun proves the interlocks can never be violated, rejects
 waits with no timeout, dead-end steps, I/O and unit mistakes, and makes double
-coils impossible to write. Then it generates IEC 61131-3 Structured Text for
-OpenPLC or CODESYS, and runs the same program in a simulator that is tested to
-behave exactly like the generated PLC code. Every message comes in English and
+coils impossible to write. Then it generates IEC 61131-3 Structured Text that
+compiles with matiec, OpenPLC's compiler ([logs](docs/plc-verification.md)), and
+runs the same program in a simulator that is tested to behave exactly like the
+generated PLC code. Every message comes in English and
 Japanese.
 
 <!-- Demo GIF goes here: docs/demo.gif (edit, see an error, run, jam a sensor). -->
@@ -129,6 +130,7 @@ flowchart LR
 - [Language reference](docs/language-reference.md) — every construct, with examples
 - [Diagnostic codes](docs/checks.md) — every error, with real output and the fix
 - [Tejun for ladder engineers](docs/for-ladder-engineers.md) — ラダー技術者のための Tejun
+- [PLC verification](docs/plc-verification.md) — the generated ST compiled with matiec, with logs
 - [Grammar](docs/grammar.ebnf)
 
 ## Limitations
@@ -136,8 +138,9 @@ flowchart LR
 - One station per program; no multi-station lines, PackML states or robot motion.
 - The only device kind is a double-acting `Cylinder`; real-valued outputs are not driven.
 - The interlock proof handles up to 10 free inputs per station.
-- Generated Structured Text targets OpenPLC and CODESYS; compiling it in those tools is
-  checked by hand, not in CI.
+- Generated Structured Text is compiled with matiec, OpenPLC's compiler, on every push
+  ([how, with logs](docs/plc-verification.md)). It has not been run inside OpenPLC Runtime,
+  and CODESYS, Sysmac Studio and GX Works3 are untested; the same doc lists what differs there.
 - No ladder output and no connection to real hardware I/O.
 - Tejun is a development aid. It is not a certified safety system and does not replace
   a safety PLC or a hard-wired emergency stop.

@@ -11,9 +11,12 @@ Phase 7 docs done (`BUILD_PROMPTS.md` has the phase plan).
   generator `codegen/st.ts` with golden `.st` per example; `tejun build <file> [-o dir]`.
   press_feeder and conveyor_sorter gained a `Home` state because the proof found
   they ran the conveyor/belt before the cylinder was confirmed retracted.
-- Not yet verified: the generated `.st` compiling in OpenPLC (the user does this by
-  hand; matiec is not available in this environment). If it reports an error, fix
-  `codegen/st.ts` and regenerate the ST goldens on purpose.
+- matiec verification (2026-11-24): the generated `.st` for every example compiles with
+  matiec (OpenPLC's `iec2c`, fork `thiagoralves/matiec` pinned in `scripts/build-matiec.sh`)
+  and gcc compiles matiec's C output. It first failed: `AT` variables and `tj_station`
+  shared a `VAR` block (fixed; regression test in `tests/st.test.ts`). CI job `plc-compile`
+  runs it on every push (not yet run: no remote). Details and logs: `docs/plc-verification.md`.
+  Not verified: running inside OpenPLC Runtime; CODESYS / Sysmac Studio / GX Works3.
 - Phase 5: `packages/runtime` (IR interpreter, simulated machine, scenarios, timeline);
   `tejun run`; each example has a `.scenario`; equivalence test proves the simulator
   matches the generated ST scan by scan.
@@ -246,6 +249,11 @@ How diagnostics work in code:
   (all exact versions, in `packages/playground` only).
 - Playground: `npm run playground` (dev server, http://localhost:5173),
   `npm run build:playground` (static site in `packages/playground/dist`). CI builds it.
+- matiec check (needs Docker; Git Bash): `npm run build`, then `bash scripts/matiec-docker.sh`.
+  It regenerates `out/st/*.st` and compiles them with matiec + gcc in `ubuntu:24.04`
+  (same scripts as the CI `plc-compile` job). Run it after any change to `codegen/st.ts`;
+  if matiec rejects something, fix the generator, add a test, and update
+  `docs/plc-verification.md` with the real output.
 - Browser smoke test (no extra dependencies; uses installed Edge/Chrome headless):
   build, run `npx vite preview --port 4173` in `packages/playground`, then
   `node scripts/browser-smoke.mjs http://localhost:4173/ <screenshot-dir>`. It exits 1 if
