@@ -69,7 +69,14 @@ function cause(c: FaultCause): string {
       return `no transition within ${c.ms} ms`;
     case "monitor":
       return `${c.condition} is false`;
+    case "position":
+      return `${c.device} sensors (${sensorList(c.sensors)}) disagree with its tracked position (${c.position}) for ${c.ms} ms`;
   }
+}
+
+/** `clamp_ext_ls OFF, clamp_ret_ls ON` */
+export function sensorList(sensors: Readonly<Record<string, boolean>>): string {
+  return Object.entries(sensors).map(([s, v]) => `${s} ${v ? "ON" : "OFF"}`).join(", ");
 }
 
 function withOutputs(text: string, outputs: string[] | undefined): string {

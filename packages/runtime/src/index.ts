@@ -35,4 +35,4 @@ export {
   type TimedEvent,
   type ScanRecord,
 } from "./simulate.js";
-export { formatTimeline, describeEvent, type TimelineHeader } from "./timeline.js";
+export { formatTimeline, describeEvent, sensorList, type TimelineHeader } from "./timeline.js";

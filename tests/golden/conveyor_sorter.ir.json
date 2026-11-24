@@ -84,6 +84,10 @@
         "retract": "pusher_in",
         "at_ext": "pusher_ext_ls",
         "at_ret": "pusher_ret_ls"
+      },
+      "sensors": {
+        "extended": "pusher_ext_ls",
+        "retracted": "pusher_ret_ls"
       }
     }
   ],
@@ -237,7 +241,8 @@
     "HOME_TIMEOUT",
     "PUSH_TIMEOUT",
     "BACK_TIMEOUT",
-    "EXIT_JAM"
+    "EXIT_JAM",
+    "POSITION_MISMATCH"
   ],
   "handlers": {
     "onFault": "Stopped",
@@ -253,5 +258,9 @@
         "target": "Stopped"
       }
     ]
+  },
+  "positionCheck": {
+    "fault": "POSITION_MISMATCH",
+    "debounceMs": 100
   }
 }

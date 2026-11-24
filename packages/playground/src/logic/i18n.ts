@@ -1,7 +1,7 @@
 // Interface text and event-log lines in English and Japanese.
 
 import type { FaultCause, TimelineEvent } from "@tejun/runtime";
-import { describeEvent } from "@tejun/runtime";
+import { describeEvent, sensorList } from "@tejun/runtime";
 
 export type Lang = "en" | "ja";
 
@@ -100,5 +100,7 @@ function causeJa(c: FaultCause): string {
       return `${c.ms} ms 以内に遷移しません`;
     case "monitor":
       return `${c.condition} が偽です`;
+    case "position":
+      return `${c.device} のセンサ (${sensorList(c.sensors)}) が記録上の位置 (${c.position.replace(/^moving from (\w+)$/, "$1 から移動中")}) と ${c.ms} ms 一致しません`;
   }
 }

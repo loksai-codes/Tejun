@@ -27,7 +27,8 @@ export {
   type TransitionIR,
   type TimeoutIR,
   type HandlersIR,
+  type PositionCheckIR,
   type ExprIR,
 } from "./ir.js";
-export { DEVICE_KINDS, CYLINDER, type DeviceKind } from "./device-kinds.js";
+export { DEVICE_KINDS, CYLINDER, POSITION_MISMATCH, POSITION_DEBOUNCE_MS, type DeviceKind } from "./device-kinds.js";
 export { closest } from "./suggest.js";

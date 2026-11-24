@@ -5,6 +5,7 @@
 // requiring them to go to Stopped) gives every state a path to Stopped.
 
 import type * as A from "../ast.js";
+import { POSITION_MISMATCH } from "../device-kinds.js";
 import { STOPPED, isTransition, timeouts, type CheckContext } from "./context.js";
 
 export function checkReachability(ctx: CheckContext): void {
@@ -80,6 +81,15 @@ function checkHandlers(ctx: CheckContext): void {
       messageJa: `故障 \`${firstFault.name}\` が発生する可能性がありますが、\`on fault\` ハンドラがありません`,
       label: "nowhere to go",
       help: "add `on fault { outputs safe; -> Stopped }` at the end of the station",
+    });
+  } else if (!hasFaultHandler && st.devices[0]) {
+    // Every device can raise the built-in position-check fault.
+    const device = st.devices[0].name;
+    ctx.error("T0204", device.span, {
+      message: `device \`${device.name}\` can raise \`${POSITION_MISMATCH}\`, but there is no \`on fault\` handler`,
+      messageJa: `装置 \`${device.name}\` は \`${POSITION_MISMATCH}\` を発生させる可能性がありますが、\`on fault\` ハンドラがありません`,
+      label: "can fault",
+      help: "add `on fault { outputs safe; -> Stopped }` at the end of the station; the fault stops the machine when the device's sensors disagree with its tracked position",
     });
   }
 

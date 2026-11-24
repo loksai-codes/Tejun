@@ -3,7 +3,7 @@
    Station ConveyorSorter: コンベア仕分け
 
    States (tj_state):  0 Stopped, 1 Home, 2 Run, 3 Sense, 4 Push, 5 Back, 6 Pass
-   Faults (tj_fault):  0 none, 1 HOME_TIMEOUT, 2 PUSH_TIMEOUT, 3 BACK_TIMEOUT, 4 EXIT_JAM
+   Faults (tj_fault):  0 none, 1 HOME_TIMEOUT, 2 PUSH_TIMEOUT, 3 BACK_TIMEOUT, 4 EXIT_JAM, 5 POSITION_MISMATCH
    Positions (tj_pos_pusher):  0 unknown, 1 moving, 2 extended, 3 retracted
 *)
 
@@ -28,10 +28,23 @@ FUNCTION_BLOCK ConveyorSorter
     tj_step_done : BOOL := FALSE;
     tj_timer : TON;
     tj_pos_pusher : INT := 1; (* pusher position *)
+    tj_from_pusher : INT := 0; (* pusher position when its current move started *)
+    tj_mismatch_pusher : TON; (* pusher sensors disagree with its position *)
   END_VAR
 
   (* ---- Runtime monitors and E-stop: checked every scan ---- *)
   IF tj_state <> 0 THEN
+    (* position check: pusher sensors must agree with its tracked position *)
+    tj_mismatch_pusher(
+      IN := (pusher_ext_ls AND pusher_ret_ls)
+        OR (tj_pos_pusher = 2 AND NOT pusher_ext_ls)
+        OR (tj_pos_pusher = 3 AND NOT pusher_ret_ls)
+        OR (tj_pos_pusher = 1 AND tj_from_pusher = 2 AND pusher_ext_ls)
+        OR (tj_pos_pusher = 1 AND tj_from_pusher = 3 AND pusher_ret_ls),
+      PT := T#100ms);
+    IF tj_fault = 0 AND tj_mismatch_pusher.Q THEN
+      tj_fault := 5; (* POSITION_MISMATCH *)
+    END_IF;
     (* on not estop_ok *)
     IF NOT estop_ok THEN
       tj_state := 0; (* Stopped *)
@@ -111,9 +124,15 @@ FUNCTION_BLOCK ConveyorSorter
     tj_step_done := FALSE;
     tj_timer(IN := FALSE);
     CASE tj_state OF
-      1: tj_pos_pusher := 1; (* Home: pusher moving *)
-      4: tj_pos_pusher := 1; (* Push: pusher moving *)
-      5: tj_pos_pusher := 1; (* Back: pusher moving *)
+      1: (* Home: pusher moving *)
+        tj_from_pusher := tj_pos_pusher;
+        tj_pos_pusher := 1;
+      4: (* Push: pusher moving *)
+        tj_from_pusher := tj_pos_pusher;
+        tj_pos_pusher := 1;
+      5: (* Back: pusher moving *)
+        tj_from_pusher := tj_pos_pusher;
+        tj_pos_pusher := 1;
     END_CASE;
   END_IF;
 

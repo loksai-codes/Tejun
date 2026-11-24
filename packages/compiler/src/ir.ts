@@ -11,7 +11,7 @@
 //   - a timeout raises its fault when its time runs out first
 
 import type * as A from "./ast.js";
-import { DEVICE_KINDS } from "./device-kinds.js";
+import { DEVICE_KINDS, POSITION_DEBOUNCE_MS, POSITION_MISMATCH } from "./device-kinds.js";
 import type { Span } from "./source.js";
 
 export interface StationIR {
@@ -23,9 +23,19 @@ export interface StationIR {
   /** The first state of the sequence. */
   initialState: string;
   states: StateIR[];
-  /** Fault codes in order of first appearance; fault number = index + 1. */
+  /**
+   * Fault codes in order of first appearance; fault number = index + 1. The
+   * built-in POSITION_MISMATCH comes last, so it never renumbers the others.
+   */
   faults: string[];
   handlers: HandlersIR;
+  /** Runtime check that devices' sensors agree with their tracked positions; present when the station has devices. */
+  positionCheck: PositionCheckIR | undefined;
+}
+
+export interface PositionCheckIR {
+  fault: string;
+  debounceMs: number;
 }
 
 export interface SignalIR {
@@ -44,6 +54,8 @@ export interface DeviceIR {
   kind: string;
   /** Parameter name -> signal name, e.g. { extend: "clamp_out", at_ext: "clamp_ext_ls" }. */
   wiring: Record<string, string>;
+  /** Position name -> the input that confirms it, e.g. { extended: "clamp_ext_ls", retracted: "clamp_ret_ls" }. */
+  sensors: Record<string, string>;
 }
 
 export type InterlockIR =
@@ -240,12 +252,21 @@ export function buildIR(program: A.Program): StationIR {
       safety: d.safety !== undefined,
       range: d.range ? { min: d.range.min.value, max: d.range.max.value } : undefined,
     })),
-    devices: st.devices.map((d) => ({ name: d.name.name, kind: d.deviceKind.name, wiring: wiringOf(d) })),
+    devices: st.devices.map((d) => {
+      const wiring = wiringOf(d);
+      const kind = DEVICE_KINDS.get(d.deviceKind.name)!;
+      const sensors = Object.fromEntries(Object.entries(kind.states).map(([pos, param]) => [pos, wiring[param]!]));
+      return { name: d.name.name, kind: d.deviceKind.name, wiring, sensors };
+    }),
     interlocks,
     initialState: st.sequence.states[0]!.name.name,
     states,
-    faults: [...new Set(faults.sort((a, b) => a.at - b.at).map((f) => f.name))],
+    faults: [
+      ...new Set(faults.sort((a, b) => a.at - b.at).map((f) => f.name)),
+      ...(st.devices.length > 0 ? [POSITION_MISMATCH] : []),
+    ],
     handlers,
+    positionCheck: st.devices.length > 0 ? { fault: POSITION_MISMATCH, debounceMs: POSITION_DEBOUNCE_MS } : undefined,
   };
 }
 

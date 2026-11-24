@@ -54,8 +54,14 @@ describe("IR", () => {
     expect(outputsOn(ir.states.find((s) => s.name === "Idle")!)).toEqual(["conveyor"]);
   });
 
-  it("numbers faults in order of first appearance, without duplicates", () => {
-    expect(irOf("press_feeder.tejun").faults).toEqual(["OVERLOAD", "HOME_TIMEOUT", "CLAMP_TIMEOUT", "RELEASE_TIMEOUT"]);
+  it("numbers faults in order of first appearance, without duplicates, then POSITION_MISMATCH", () => {
+    expect(irOf("press_feeder.tejun").faults).toEqual([
+      "OVERLOAD",
+      "HOME_TIMEOUT",
+      "CLAMP_TIMEOUT",
+      "RELEASE_TIMEOUT",
+      "POSITION_MISMATCH",
+    ]);
     expect(irOf("pick_place.tejun").faults).toEqual([
       "Z_DOWN_TIMEOUT",
       "NO_VACUUM",
@@ -63,7 +69,14 @@ describe("IR", () => {
       "X_OUT_TIMEOUT",
       "VACUUM_STUCK",
       "X_HOME_TIMEOUT",
+      "POSITION_MISMATCH",
     ]);
+  });
+
+  it("adds the position check and each device's position sensors", () => {
+    const ir = irOf("press_feeder.tejun");
+    expect(ir.positionCheck).toEqual({ fault: "POSITION_MISMATCH", debounceMs: 100 });
+    expect(ir.devices[0]!.sensors).toEqual({ extended: "clamp_ext_ls", retracted: "clamp_ret_ls" });
   });
 
   it("keeps every state's transitions pointing at a real state or Stopped", () => {

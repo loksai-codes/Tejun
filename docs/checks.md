@@ -230,7 +230,7 @@ error[T0101]: undefined name `part_presnt`
 
 ### T0102
 
-**duplicate name.** The same name declared twice, or a state named `Stopped`, which is built in.
+**duplicate name.** The same name declared twice, a state named `Stopped`, or a fault named `POSITION_MISMATCH`. Both are built in: handlers go to `Stopped`, and `POSITION_MISMATCH` is raised by the device position check.
 
 From `tests/fixtures/errors/T0102_builtin_stopped.tejun`:
 
@@ -245,7 +245,7 @@ error[T0102]: `Stopped` is a built-in state and cannot be declared
    = 日本語: `Stopped` は組み込みの状態のため宣言できません
 ```
 
-**Fix:** Rename one of them. Never declare `Stopped`; handlers go there automatically.
+**Fix:** Rename one of them. Never declare `Stopped` or raise `POSITION_MISMATCH` yourself.
 
 ### T0103
 
@@ -405,7 +405,7 @@ error[T0203]: interlock violated: `conveyor` can be ON while `clamp.retracted` i
 
 ### T0204
 
-**fault with no `on fault` handler.** A fault can be raised but nothing handles it.
+**fault with no `on fault` handler.** A fault can be raised but nothing handles it. Every station with a device can fault: the built-in position check raises `POSITION_MISMATCH` when a device's sensors disagree with its tracked position.
 
 From `tests/fixtures/errors/T0204_no_fault_handler.tejun`:
 

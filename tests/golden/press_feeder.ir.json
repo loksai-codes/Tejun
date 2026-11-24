@@ -81,6 +81,10 @@
         "retract": "clamp_in",
         "at_ext": "clamp_ext_ls",
         "at_ret": "clamp_ret_ls"
+      },
+      "sensors": {
+        "extended": "clamp_ext_ls",
+        "retracted": "clamp_ret_ls"
       }
     }
   ],
@@ -228,7 +232,8 @@
     "OVERLOAD",
     "HOME_TIMEOUT",
     "CLAMP_TIMEOUT",
-    "RELEASE_TIMEOUT"
+    "RELEASE_TIMEOUT",
+    "POSITION_MISMATCH"
   ],
   "handlers": {
     "onFault": "Stopped",
@@ -244,5 +249,9 @@
         "target": "Stopped"
       }
     ]
+  },
+  "positionCheck": {
+    "fault": "POSITION_MISMATCH",
+    "debounceMs": 100
   }
 }

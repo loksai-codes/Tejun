@@ -3,7 +3,7 @@
    Station PressFeeder: プレス送り
 
    States (tj_state):  0 Stopped, 1 Home, 2 Idle, 3 Clamp, 4 Press, 5 Release
-   Faults (tj_fault):  0 none, 1 OVERLOAD, 2 HOME_TIMEOUT, 3 CLAMP_TIMEOUT, 4 RELEASE_TIMEOUT
+   Faults (tj_fault):  0 none, 1 OVERLOAD, 2 HOME_TIMEOUT, 3 CLAMP_TIMEOUT, 4 RELEASE_TIMEOUT, 5 POSITION_MISMATCH
    Positions (tj_pos_clamp):  0 unknown, 1 moving, 2 extended, 3 retracted
 *)
 
@@ -27,6 +27,8 @@ FUNCTION_BLOCK PressFeeder
     tj_step_done : BOOL := FALSE;
     tj_timer : TON;
     tj_pos_clamp : INT := 1; (* clamp position *)
+    tj_from_clamp : INT := 0; (* clamp position when its current move started *)
+    tj_mismatch_clamp : TON; (* clamp sensors disagree with its position *)
   END_VAR
 
   (* ---- Runtime monitors and E-stop: checked every scan ---- *)
@@ -34,6 +36,17 @@ FUNCTION_BLOCK PressFeeder
     (* interlock press_force < 40 kN else fault OVERLOAD *)
     IF tj_fault = 0 AND NOT (press_force < 40.0) THEN
       tj_fault := 1; (* OVERLOAD *)
+    END_IF;
+    (* position check: clamp sensors must agree with its tracked position *)
+    tj_mismatch_clamp(
+      IN := (clamp_ext_ls AND clamp_ret_ls)
+        OR (tj_pos_clamp = 2 AND NOT clamp_ext_ls)
+        OR (tj_pos_clamp = 3 AND NOT clamp_ret_ls)
+        OR (tj_pos_clamp = 1 AND tj_from_clamp = 2 AND clamp_ext_ls)
+        OR (tj_pos_clamp = 1 AND tj_from_clamp = 3 AND clamp_ret_ls),
+      PT := T#100ms);
+    IF tj_fault = 0 AND tj_mismatch_clamp.Q THEN
+      tj_fault := 5; (* POSITION_MISMATCH *)
     END_IF;
     (* on not estop_ok *)
     IF NOT estop_ok THEN
@@ -111,9 +124,15 @@ FUNCTION_BLOCK PressFeeder
     tj_step_done := FALSE;
     tj_timer(IN := FALSE);
     CASE tj_state OF
-      1: tj_pos_clamp := 1; (* Home: clamp moving *)
-      3: tj_pos_clamp := 1; (* Clamp: clamp moving *)
-      5: tj_pos_clamp := 1; (* Release: clamp moving *)
+      1: (* Home: clamp moving *)
+        tj_from_clamp := tj_pos_clamp;
+        tj_pos_clamp := 1;
+      3: (* Clamp: clamp moving *)
+        tj_from_clamp := tj_pos_clamp;
+        tj_pos_clamp := 1;
+      5: (* Release: clamp moving *)
+        tj_from_clamp := tj_pos_clamp;
+        tj_pos_clamp := 1;
     END_CASE;
   END_IF;
 

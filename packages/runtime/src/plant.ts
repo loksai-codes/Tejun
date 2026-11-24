@@ -57,6 +57,16 @@ export class Plant {
     return Object.fromEntries(this.cylinders.map((c) => [c.device, c.progress / this.travelMs]));
   }
 
+  /**
+   * Put a device somewhere by hand, from 0 (retracted) to 1 (extended),
+   * without the program knowing: what an operator pushing a cylinder does.
+   */
+  moveByHand(device: string, fraction: number): void {
+    const c = this.cylinders.find((x) => x.device === device);
+    if (!c) throw new Error(`no device \`${device}\``);
+    c.progress = Math.min(1, Math.max(0, fraction)) * this.travelMs;
+  }
+
   /** Move the devices for `dtMs` with the given outputs. */
   advance(outputs: Readonly<Record<string, boolean>>, dtMs: number): void {
     for (const c of this.cylinders) {

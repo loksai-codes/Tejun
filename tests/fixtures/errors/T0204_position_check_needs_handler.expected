@@ -1,0 +1,8 @@
+error[T0204]: device `clamp` can raise `POSITION_MISMATCH`, but there is no `on fault` handler
+  --> tests/fixtures/errors/T0204_position_check_needs_handler.tejun:11:10
+   |
+11 |   device clamp : Cylinder(extend: clamp_out, retract: clamp_in,
+   |          ^^^^^ can fault
+   |
+   = help: add `on fault { outputs safe; -> Stopped }` at the end of the station; the fault stops the machine when the device's sensors disagree with its tracked position
+   = 日本語: 装置 `clamp` は `POSITION_MISMATCH` を発生させる可能性がありますが、`on fault` ハンドラがありません

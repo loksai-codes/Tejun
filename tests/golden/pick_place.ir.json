@@ -108,6 +108,10 @@
         "retract": "z_up",
         "at_ext": "z_down_ls",
         "at_ret": "z_up_ls"
+      },
+      "sensors": {
+        "extended": "z_down_ls",
+        "retracted": "z_up_ls"
       }
     },
     {
@@ -118,6 +122,10 @@
         "retract": "x_home",
         "at_ext": "x_out_ls",
         "at_ret": "x_home_ls"
+      },
+      "sensors": {
+        "extended": "x_out_ls",
+        "retracted": "x_home_ls"
       }
     }
   ],
@@ -341,7 +349,8 @@
     "Z_UP_TIMEOUT",
     "X_OUT_TIMEOUT",
     "VACUUM_STUCK",
-    "X_HOME_TIMEOUT"
+    "X_HOME_TIMEOUT",
+    "POSITION_MISMATCH"
   ],
   "handlers": {
     "onFault": "Stopped",
@@ -357,5 +366,9 @@
         "target": "Stopped"
       }
     ]
+  },
+  "positionCheck": {
+    "fault": "POSITION_MISMATCH",
+    "debounceMs": 100
   }
 }

@@ -24,7 +24,7 @@ ${parts.extra ?? ""}
   sequence main {
 ${parts.states ?? "    state S { y on; when a forever -> S }"}
   }
-${parts.handlers ?? "  on not estop_ok { outputs safe; -> Stopped }"}
+${parts.handlers ?? "  on fault { outputs safe; -> Stopped }\n  on not estop_ok { outputs safe; -> Stopped }"}
 }
 `;
 }
@@ -126,7 +126,7 @@ describe("checker", () => {
   });
 
   it("reports the E-stop handler missing when no safety input exists", () => {
-    const text = station({ handlers: "" }).replace(" safety", "");
+    const text = station({ handlers: "  on fault { outputs safe; -> Stopped }" }).replace(" safety", "");
     const d = check("t.tejun", text).diagnostics;
     expect(d.map((x) => x.code)).toEqual(["T0205"]);
     expect(d[0]!.help).toContain("declare the E-stop input");

@@ -44,3 +44,14 @@ export const CYLINDER: DeviceKind = {
 };
 
 export const DEVICE_KINDS: ReadonlyMap<string, DeviceKind> = new Map([[CYLINDER.name, CYLINDER]]);
+
+/**
+ * Built-in fault raised when a device's sensors disagree with its tracked
+ * position for at least POSITION_DEBOUNCE_MS: two end sensors ON at once, or
+ * the device is tracked at an end whose sensor is OFF (moved by hand, sensor
+ * failed). Programs cannot use this name for their own faults (T0102).
+ */
+export const POSITION_MISMATCH = "POSITION_MISMATCH";
+
+/** How long a position mismatch must last before POSITION_MISMATCH is raised. */
+export const POSITION_DEBOUNCE_MS = 100;

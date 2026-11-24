@@ -15,6 +15,12 @@
 //     against the state a scan ends in and the inputs that scan read
 // `never` and `requires` interlocks are proved; `<cond> else fault`
 // interlocks are runtime monitors and are not part of the proof.
+//
+// The device position check (POSITION_MISMATCH) is not modelled separately:
+// all it can do is stop the machine, and every station has an E-stop handler
+// whose input is free here, so "stop in any scan" is already explored. The
+// check is what makes tracked positions trustworthy at runtime; see
+// docs/model-assumptions.md.
 
 import type * as A from "../ast.js";
 import { DEVICE_KINDS } from "../device-kinds.js";

@@ -4,7 +4,8 @@
 // (packages/compiler/src/codegen/st.ts), so the simulator behaves like the
 // PLC code. tests/equivalence.test.ts runs both side by side to prove it.
 //
-//   1. runtime monitors and E-stop handlers (may stop the machine)
+//   1. runtime monitors, the device position check and E-stop handlers
+//      (may stop the machine)
 //   2. the current state: its step, or once the step is done its transitions
 //   3. state entry for a new state: reset the step and timer, mark devices moving
 //   4. every output assigned from the final state of the scan
@@ -35,7 +36,16 @@ export type Inputs = Readonly<Record<string, boolean | number>>;
 export type FaultCause =
   | { kind: "monitor"; condition: string }
   | { kind: "step"; sensor: string; ms: number }
-  | { kind: "wait"; ms: number };
+  | { kind: "wait"; ms: number }
+  | {
+      kind: "position";
+      device: string;
+      /** Tracked position: a device state name, "unknown", "moving", or "moving from <state>". */
+      position: string;
+      /** The device's end sensors as read in the faulting scan. */
+      sensors: Readonly<Record<string, boolean>>;
+      ms: number;
+    };
 
 /** Something that happened during one scan. */
 export type ScanEvent =
@@ -64,6 +74,10 @@ export class StationRuntime {
   private lastState: string;
   private stepDone = false;
   private readonly timer = new Ton();
+  /** Device name -> its position when its current move started (for the position check). */
+  private readonly from: Record<string, string>;
+  /** Device name -> debounce timer of its position check. */
+  private readonly mismatchTimers: Map<string, Ton>;
 
   constructor(ir: StationIR) {
     this.ir = ir;
@@ -77,6 +91,8 @@ export class StationRuntime {
       ir.devices.map((d) => [d.name, initial.step?.kind === "device" && initial.step.device === d.name ? MOVING : UNKNOWN]),
     );
     this.outputs = Object.fromEntries(this.boolOutputs.map((o) => [o, false]));
+    this.mismatchTimers = new Map(ir.positionCheck ? ir.devices.map((d) => [d.name, new Ton()]) : []);
+    this.from = Object.fromEntries(ir.devices.map((d) => [d.name, UNKNOWN]));
   }
 
   /** Fault number as in the generated code: 0 none, else 1-based position in `ir.faults`. */
@@ -101,6 +117,7 @@ export class StationRuntime {
           this.raise(i.fault, { kind: "monitor", condition: formatExpr(i.condition) }, events);
         }
       }
+      this.checkPositions(inputs, nowMs, events);
       for (const h of this.ir.handlers.conditions) {
         if (this.truth(h.condition, inputs)) {
           if (this.fault === undefined && this.state !== STOPPED) {
@@ -123,7 +140,10 @@ export class StationRuntime {
       this.stepDone = false;
       this.timer.call(nowMs, false);
       const entered = this.states.get(this.state);
-      if (entered?.step?.kind === "device") this.pos[entered.step.device] = MOVING;
+      if (entered?.step?.kind === "device") {
+        this.from[entered.step.device] = this.pos[entered.step.device]!;
+        this.pos[entered.step.device] = MOVING;
+      }
     }
 
     // 4. Outputs.
@@ -136,6 +156,32 @@ export class StationRuntime {
       if (this.violated(i, inputs)) events.push({ kind: "violation", interlock: describeInterlock(i) });
     }
     return { events, state: this.state, fault: this.fault, outputs: this.outputs };
+  }
+
+  /**
+   * Per device, a mismatch is any of: two end sensors ON at once; the device
+   * is tracked at an end whose sensor is OFF; or it is moving away from an
+   * end whose sensor is still ON. Lasting `debounceMs` raises the fault. Same
+   * expression and order as codegen/st.ts.
+   */
+  private checkPositions(inputs: Inputs, nowMs: number, events: ScanEvent[]): void {
+    const check = this.ir.positionCheck;
+    if (!check) return;
+    for (const d of this.ir.devices) {
+      const ends = Object.entries(d.sensors);
+      const on = (sensor: string) => inputs[sensor] === true;
+      const bothOn = ends.some(([, a], i) => ends.slice(i + 1).some(([, b]) => on(a) && on(b)));
+      const endLost = ends.some(([pos, sensor]) => this.pos[d.name] === pos && !on(sensor));
+      const notLeaving = this.pos[d.name] === MOVING && ends.some(([pos, sensor]) => this.from[d.name] === pos && on(sensor));
+      const timer = this.mismatchTimers.get(d.name)!;
+      timer.call(nowMs, bothOn || endLost || notLeaving, check.debounceMs);
+      if (this.fault === undefined && timer.q) {
+        const sensors = Object.fromEntries(ends.map(([, sensor]) => [sensor, on(sensor)]));
+        const pos = this.pos[d.name]!;
+        const position = pos === MOVING && this.from[d.name] !== UNKNOWN ? `moving from ${this.from[d.name]}` : pos;
+        this.raise(check.fault, { kind: "position", device: d.name, position, sensors, ms: check.debounceMs }, events);
+      }
+    }
   }
 
   private runState(state: StateIR, env: { inputs: Inputs; nowMs: number; events: ScanEvent[] }): void {

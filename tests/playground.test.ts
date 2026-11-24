@@ -60,6 +60,17 @@ describe("formatEvent", () => {
     expect(en).toContain("Clamp -> Stopped  · outputs: all OFF");
   });
 
+  it("explains POSITION_MISMATCH in both languages", () => {
+    const run = simulate(ir, { scenario, jams: [{ sensor: "clamp_ret_ls", value: true }] });
+    const fault = run.events.find((e) => e.event.kind === "fault")!.event;
+    expect(formatEvent(fault, "en", units)).toBe(
+      "FAULT 5 POSITION_MISMATCH: clamp sensors (clamp_ext_ls OFF, clamp_ret_ls ON) disagree with its tracked position (moving from retracted) for 100 ms",
+    );
+    expect(formatEvent(fault, "ja", units)).toBe(
+      "故障 5 POSITION_MISMATCH: clamp のセンサ (clamp_ext_ls OFF, clamp_ret_ls ON) が記録上の位置 (retracted から移動中) と 100 ms 一致しません",
+    );
+  });
+
   it("translates every interface string", () => {
     expect(t("run", "ja")).toBe("実行");
     expect(t("run", "en")).toBe("Run");

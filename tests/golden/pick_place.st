@@ -3,7 +3,7 @@
    Station PickPlace: ピック&プレース
 
    States (tj_state):  0 Stopped, 1 Wait, 2 Pick, 3 Grip, 4 Lift, 5 Carry, 6 Place, 7 Drop, 8 Rise, 9 Return
-   Faults (tj_fault):  0 none, 1 Z_DOWN_TIMEOUT, 2 NO_VACUUM, 3 Z_UP_TIMEOUT, 4 X_OUT_TIMEOUT, 5 VACUUM_STUCK, 6 X_HOME_TIMEOUT
+   Faults (tj_fault):  0 none, 1 Z_DOWN_TIMEOUT, 2 NO_VACUUM, 3 Z_UP_TIMEOUT, 4 X_OUT_TIMEOUT, 5 VACUUM_STUCK, 6 X_HOME_TIMEOUT, 7 POSITION_MISMATCH
    Positions (tj_pos_z):  0 unknown, 1 moving, 2 extended, 3 retracted
    Positions (tj_pos_x):  0 unknown, 1 moving, 2 extended, 3 retracted
 *)
@@ -33,10 +33,36 @@ FUNCTION_BLOCK PickPlace
     tj_timer : TON;
     tj_pos_z : INT := 0; (* z position *)
     tj_pos_x : INT := 0; (* x position *)
+    tj_from_z : INT := 0; (* z position when its current move started *)
+    tj_mismatch_z : TON; (* z sensors disagree with its position *)
+    tj_from_x : INT := 0; (* x position when its current move started *)
+    tj_mismatch_x : TON; (* x sensors disagree with its position *)
   END_VAR
 
   (* ---- Runtime monitors and E-stop: checked every scan ---- *)
   IF tj_state <> 0 THEN
+    (* position check: z sensors must agree with its tracked position *)
+    tj_mismatch_z(
+      IN := (z_down_ls AND z_up_ls)
+        OR (tj_pos_z = 2 AND NOT z_down_ls)
+        OR (tj_pos_z = 3 AND NOT z_up_ls)
+        OR (tj_pos_z = 1 AND tj_from_z = 2 AND z_down_ls)
+        OR (tj_pos_z = 1 AND tj_from_z = 3 AND z_up_ls),
+      PT := T#100ms);
+    IF tj_fault = 0 AND tj_mismatch_z.Q THEN
+      tj_fault := 7; (* POSITION_MISMATCH *)
+    END_IF;
+    (* position check: x sensors must agree with its tracked position *)
+    tj_mismatch_x(
+      IN := (x_out_ls AND x_home_ls)
+        OR (tj_pos_x = 2 AND NOT x_out_ls)
+        OR (tj_pos_x = 3 AND NOT x_home_ls)
+        OR (tj_pos_x = 1 AND tj_from_x = 2 AND x_out_ls)
+        OR (tj_pos_x = 1 AND tj_from_x = 3 AND x_home_ls),
+      PT := T#100ms);
+    IF tj_fault = 0 AND tj_mismatch_x.Q THEN
+      tj_fault := 7; (* POSITION_MISMATCH *)
+    END_IF;
     (* on not estop_ok *)
     IF NOT estop_ok THEN
       tj_state := 0; (* Stopped *)
@@ -156,12 +182,24 @@ FUNCTION_BLOCK PickPlace
     tj_step_done := FALSE;
     tj_timer(IN := FALSE);
     CASE tj_state OF
-      2: tj_pos_z := 1; (* Pick: z moving *)
-      4: tj_pos_z := 1; (* Lift: z moving *)
-      5: tj_pos_x := 1; (* Carry: x moving *)
-      6: tj_pos_z := 1; (* Place: z moving *)
-      8: tj_pos_z := 1; (* Rise: z moving *)
-      9: tj_pos_x := 1; (* Return: x moving *)
+      2: (* Pick: z moving *)
+        tj_from_z := tj_pos_z;
+        tj_pos_z := 1;
+      4: (* Lift: z moving *)
+        tj_from_z := tj_pos_z;
+        tj_pos_z := 1;
+      5: (* Carry: x moving *)
+        tj_from_x := tj_pos_x;
+        tj_pos_x := 1;
+      6: (* Place: z moving *)
+        tj_from_z := tj_pos_z;
+        tj_pos_z := 1;
+      8: (* Rise: z moving *)
+        tj_from_z := tj_pos_z;
+        tj_pos_z := 1;
+      9: (* Return: x moving *)
+        tj_from_x := tj_pos_x;
+        tj_pos_x := 1;
     END_CASE;
   END_IF;
 

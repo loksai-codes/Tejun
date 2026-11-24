@@ -7,7 +7,8 @@
 // For CODESYS, copy only the FUNCTION_BLOCK.
 //
 // The scan order matches the interlock proof (checker/interlocks.ts):
-//   1. runtime monitors and E-stop handlers (may stop the machine)
+//   1. runtime monitors, the device position check and E-stop handlers
+//      (may stop the machine)
 //   2. the current state: its step, or once the step is done its transitions
 //   3. state entry for a new state: reset the step and timer, mark devices moving
 //   4. every output assigned exactly once from the final state of the scan
@@ -114,6 +115,12 @@ class Generator {
           const moving = initial.step?.kind === "device" && initial.step.device === d.name;
           this.line(`tj_pos_${d.name} : INT := ${moving ? POS_MOVING : POS_UNKNOWN}; (* ${d.name} position *)`);
         }
+        if (ir.positionCheck) {
+          for (const d of ir.devices) {
+            this.line(`tj_from_${d.name} : INT := ${POS_UNKNOWN}; (* ${d.name} position when its current move started *)`);
+            this.line(`tj_mismatch_${d.name} : TON; (* ${d.name} sensors disagree with its position *)`);
+          }
+        }
       });
       this.line("END_VAR");
       this.line("");
@@ -142,6 +149,7 @@ class Generator {
         this.block(() => this.line(`tj_fault := ${this.faultNo.get(i.fault)}; (* ${i.fault} *)`));
         this.line("END_IF;");
       }
+      this.positionCheck();
       for (const h of ir.handlers.conditions) {
         this.line(`(* on ${comment(tejun(h.condition))} *)`);
         this.line(`IF ${this.expr(h.condition)} THEN`);
@@ -151,6 +159,39 @@ class Generator {
     });
     this.line("END_IF;");
     this.stopOnFault();
+  }
+
+  /**
+   * Per device, a mismatch is any of: two end sensors ON at once; the device
+   * is tracked at an end whose sensor is OFF; or it is moving away from an
+   * end whose sensor is still ON. Lasting `debounceMs` raises the fault. The
+   * timer runs every scan outside Stopped.
+   */
+  private positionCheck(): void {
+    const check = this.ir.positionCheck;
+    if (!check) return;
+    for (const d of this.ir.devices) {
+      const ends = Object.entries(d.sensors);
+      const terms: string[] = [];
+      for (let i = 0; i < ends.length; i++) {
+        for (let j = i + 1; j < ends.length; j++) terms.push(`(${ends[i]![1]} AND ${ends[j]![1]})`);
+      }
+      const no = (pos: string) => this.posNo.get(d.name)!.get(pos)!;
+      for (const [pos, sensor] of ends) terms.push(`(tj_pos_${d.name} = ${no(pos)} AND NOT ${sensor})`);
+      for (const [pos, sensor] of ends) {
+        terms.push(`(tj_pos_${d.name} = ${POS_MOVING} AND tj_from_${d.name} = ${no(pos)} AND ${sensor})`);
+      }
+      this.line(`(* position check: ${d.name} sensors must agree with its tracked position *)`);
+      this.line(`tj_mismatch_${d.name}(`);
+      this.block(() => {
+        this.line(`IN := ${terms[0]}`);
+        this.block(() => terms.slice(1).forEach((t, i) => this.line(`OR ${t}${i === terms.length - 2 ? "," : ""}`)));
+        this.line(`PT := ${time(check.debounceMs)});`);
+      });
+      this.line(`IF tj_fault = 0 AND tj_mismatch_${d.name}.Q THEN`);
+      this.block(() => this.line(`tj_fault := ${this.faultNo.get(check.fault)}; (* ${check.fault} *)`));
+      this.line("END_IF;");
+    }
   }
 
   private stopOnFault(): void {
@@ -254,7 +295,16 @@ class Generator {
       this.block(() => {
         for (const s of moving) {
           if (s.step?.kind !== "device") continue;
-          this.line(`${this.stateNo.get(s.name)}: tj_pos_${s.step.device} := ${POS_MOVING}; (* ${s.name}: ${s.step.device} moving *)`);
+          const d = s.step.device;
+          if (this.ir.positionCheck) {
+            this.line(`${this.stateNo.get(s.name)}: (* ${s.name}: ${d} moving *)`);
+            this.block(() => {
+              this.line(`tj_from_${d} := tj_pos_${d};`);
+              this.line(`tj_pos_${d} := ${POS_MOVING};`);
+            });
+          } else {
+            this.line(`${this.stateNo.get(s.name)}: tj_pos_${d} := ${POS_MOVING}; (* ${s.name}: ${d} moving *)`);
+          }
         }
       });
       this.line("END_CASE;");
