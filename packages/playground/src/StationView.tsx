@@ -1,6 +1,7 @@
 // SVG picture of any station: each Cylinder with its rod moving in real time,
-// its valve outputs and end sensors; then the state graph with the current
-// state highlighted. Built from the IR, so it works for every program.
+// its valve outputs and end sensors; each Motor with its run output, speed
+// and feedback; then the state graph with the current state highlighted.
+// Built from the IR, so it works for every program.
 
 import type { StationIR } from "@tejun/compiler";
 import type { ScanRecord } from "@tejun/runtime";
@@ -20,13 +21,13 @@ interface Props {
 }
 
 export function StationView({ ir, positions, last, lang }: Props) {
-  const cylinders = ir.devices.filter((d) => d.kind === "Cylinder");
+  const devices = ir.devices.filter((d) => d.kind === "Cylinder" || d.kind === "Motor");
   const states = [...ir.states.map((s) => s.name), "Stopped"];
   const current = last?.state ?? ir.initialState;
   const isOn = (signal: string) => last?.outputs[signal] === true || last?.inputs[signal] === true;
 
   const devicesTop = 24;
-  const statesTop = devicesTop + Math.max(cylinders.length, 1) * ROW + 28;
+  const statesTop = devicesTop + Math.max(devices.length, 1) * ROW + 28;
   const stateRows = Math.ceil(states.length / STATES_PER_ROW);
   const height = statesTop + 20 + stateRows * (STATE_H + 18);
 
@@ -40,24 +41,36 @@ export function StationView({ ir, positions, last, lang }: Props) {
       <text x={0} y={14} className="muted">
         {t("devices", lang)}
       </text>
-      {cylinders.length === 0 ? (
+      {devices.length === 0 ? (
         <text x={0} y={devicesTop + 30} className="muted">
           —
         </text>
       ) : null}
-      {cylinders.map((d, i) => (
-        <Cylinder
-          key={d.name}
-          y={devicesTop + i * ROW}
-          name={d.name}
-          position={positions[d.name] ?? 0}
-          extend={d.wiring.extend!}
-          retract={d.wiring.retract!}
-          atExt={d.wiring.at_ext!}
-          atRet={d.wiring.at_ret!}
-          isOn={isOn}
-        />
-      ))}
+      {devices.map((d, i) =>
+        d.kind === "Motor" ? (
+          <Motor
+            key={d.name}
+            y={devicesTop + i * ROW}
+            name={d.name}
+            speed={positions[d.name] ?? 0}
+            run={d.wiring.run!}
+            feedback={d.wiring.feedback!}
+            isOn={isOn}
+          />
+        ) : (
+          <Cylinder
+            key={d.name}
+            y={devicesTop + i * ROW}
+            name={d.name}
+            position={positions[d.name] ?? 0}
+            extend={d.wiring.extend!}
+            retract={d.wiring.retract!}
+            atExt={d.wiring.at_ext!}
+            atRet={d.wiring.at_ret!}
+            isOn={isOn}
+          />
+        ),
+      )}
 
       <text x={0} y={statesTop} className="muted">
         {t("states", lang)}
@@ -141,6 +154,50 @@ function Cylinder({ y, name, position, extend, retract, atExt, atRet, isOn }: Cy
       {/* end sensors */}
       <Led x={barrelX + barrelW + 7} y={mid + 30} on={isOn(atRet)} label={atRet} labelSide="left" />
       <Led x={barrelX + barrelW + stroke + 7} y={mid + 30} on={isOn(atExt)} label={atExt} labelSide="right" />
+    </g>
+  );
+}
+
+interface MotorProps {
+  y: number;
+  name: string;
+  /** 0 = standstill, 1 = full speed. */
+  speed: number;
+  run: string;
+  feedback: string;
+  isOn(signal: string): boolean;
+}
+
+function Motor({ y, name, speed, run, feedback, isOn }: MotorProps) {
+  const bodyX = 150;
+  const mid = y + 26;
+  const barW = 150;
+  return (
+    <g>
+      <text x={0} y={mid + 4} style={{ fontWeight: 600 }}>
+        {name}
+      </text>
+      <text x={0} y={mid + 20} className="muted">
+        Motor
+      </text>
+
+      {/* run output */}
+      <Arrow x={bodyX - 34} y={mid - 4} dir="right" on={isOn(run)} label={run} />
+
+      {/* motor body and shaft */}
+      <rect x={bodyX} y={mid - 16} width={60} height={32} rx={6} fill="var(--surface-2)" stroke="var(--metal-dark)" />
+      <text x={bodyX + 30} y={mid + 5} textAnchor="middle" style={{ fontWeight: 600 }}>
+        M
+      </text>
+      <rect x={bodyX + 60} y={mid - 3} width={14} height={6} fill="var(--metal)" />
+
+      {/* speed */}
+      <rect x={bodyX + 90} y={mid - 6} width={barW} height={12} rx={3} fill="var(--surface-2)" stroke="var(--metal-dark)" />
+      <rect x={bodyX + 90} y={mid - 6} width={barW * speed} height={12} rx={3} fill="var(--metal)" />
+      <title>{`${name}: ${Math.round(speed * 100)} %`}</title>
+
+      {/* feedback */}
+      <Led x={bodyX + 90 + barW + 14} y={mid + 30} on={isOn(feedback)} label={feedback} labelSide="right" />
     </g>
   );
 }

@@ -1,0 +1,12 @@
+PressStation プレスステーション · scenario examples/press_station.scenario · scan 20 ms · jammed: belt_fb (stuck OFF)
+   time  event
+  0.000  start in HomeRam                   outputs: ram_up
+  0.000  clamp_ret_ls ON (clamp)
+  0.000  ram_up_ls ON (ram)
+  0.000  estop_ok ON (default)
+  0.020  HomeRam -> HomeClamp               outputs: clamp_in
+  0.060  HomeClamp -> Feed                  outputs: belt_run
+  1.080  FAULT 4 BELT_NO_START: belt_fb not ON within 1000 ms
+  1.080  Feed -> Stopped                    outputs: all OFF
+end at 1.080 s: Stopped, fault BELT_NO_START
+終了 1.080 秒: Stopped、故障 BELT_NO_START

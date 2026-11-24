@@ -85,10 +85,18 @@
         "at_ext": "pusher_ext_ls",
         "at_ret": "pusher_ret_ls"
       },
-      "sensors": {
-        "extended": "pusher_ext_ls",
-        "retracted": "pusher_ret_ls"
-      }
+      "states": {
+        "extended": {
+          "sensor": "pusher_ext_ls",
+          "value": true
+        },
+        "retracted": {
+          "sensor": "pusher_ret_ls",
+          "value": true
+        }
+      },
+      "mismatchFault": "POSITION_MISMATCH",
+      "tracked": "position"
     }
   ],
   "interlocks": [
@@ -128,6 +136,7 @@
         "action": "retract",
         "drive": "pusher_in",
         "done": "pusher_ret_ls",
+        "target": "retracted",
         "timeout": {
           "kind": "within",
           "ms": 1500,
@@ -183,6 +192,7 @@
         "action": "extend",
         "drive": "pusher_out",
         "done": "pusher_ext_ls",
+        "target": "extended",
         "timeout": {
           "kind": "within",
           "ms": 1500,
@@ -204,6 +214,7 @@
         "action": "retract",
         "drive": "pusher_in",
         "done": "pusher_ret_ls",
+        "target": "retracted",
         "timeout": {
           "kind": "within",
           "ms": 1500,
@@ -259,8 +270,7 @@
       }
     ]
   },
-  "positionCheck": {
-    "fault": "POSITION_MISMATCH",
+  "deviceCheck": {
     "debounceMs": 100
   }
 }

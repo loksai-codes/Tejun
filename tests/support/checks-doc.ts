@@ -58,8 +58,8 @@ export const CHECKS: Record<DiagnosticCode, Entry> = {
     fix: "Fix the spelling (see `did you mean`), or declare it.",
   },
   T0102: {
-    why: "The same name declared twice, a state named `Stopped`, or a fault named `POSITION_MISMATCH`. Both are built in: handlers go to `Stopped`, and `POSITION_MISMATCH` is raised by the device position check.",
-    fix: "Rename one of them. Never declare `Stopped` or raise `POSITION_MISMATCH` yourself.",
+    why: "The same name declared twice, a state named `Stopped`, or a fault named `POSITION_MISMATCH` or `FEEDBACK_MISMATCH`. These are built in: handlers go to `Stopped`, and the device check raises `POSITION_MISMATCH` (Cylinder) and `FEEDBACK_MISMATCH` (Motor).",
+    fix: "Rename one of them. Never declare `Stopped` or raise a built-in device fault yourself.",
   },
   T0103: {
     why: "A value of the wrong type: a real signal used as a condition, a bool compared with `<`, a device used as a signal, a real output switched on.",
@@ -94,7 +94,7 @@ export const CHECKS: Record<DiagnosticCode, Entry> = {
     fix: "Follow the help line: home the device first (`state Home { clamp.retract … -> Idle }`), switch the output on only after the move is confirmed, or switch one of the outputs off in that state.",
   },
   T0204: {
-    why: "A fault can be raised but nothing handles it. Every station with a device can fault: the built-in position check raises `POSITION_MISMATCH` when a device's sensors disagree with its tracked position.",
+    why: "A fault can be raised but nothing handles it. Every station with a device can fault: the built-in device check raises `POSITION_MISMATCH` (Cylinder) or `FEEDBACK_MISMATCH` (Motor) when a device's sensors disagree with its tracked state.",
     fix: "Add `on fault { outputs safe; -> Stopped }`.",
   },
   T0205: {

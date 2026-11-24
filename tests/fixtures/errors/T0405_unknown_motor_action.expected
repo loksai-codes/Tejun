@@ -1,0 +1,8 @@
+error[T0405]: Motor has no action `start`
+  --> tests/fixtures/errors/T0405_unknown_motor_action.tejun:13:25
+   |
+13 |     state Feed   { belt.start within 1 s else fault BELT_NO_START;
+   |                         ^^^^^ unknown action
+   |
+   = help: Motor actions: run
+   = 日本語: Motor に動作 `start` はありません

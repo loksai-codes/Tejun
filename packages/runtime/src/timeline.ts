@@ -69,8 +69,8 @@ function cause(c: FaultCause): string {
       return `no transition within ${c.ms} ms`;
     case "monitor":
       return `${c.condition} is false`;
-    case "position":
-      return `${c.device} sensors (${sensorList(c.sensors)}) disagree with its tracked position (${c.position}) for ${c.ms} ms`;
+    case "mismatch":
+      return `${c.device} sensors (${sensorList(c.sensors)}) disagree with its tracked ${c.tracked} (${c.state}) for ${c.ms} ms`;
   }
 }
 

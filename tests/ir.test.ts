@@ -73,10 +73,30 @@ describe("IR", () => {
     ]);
   });
 
-  it("adds the position check and each device's position sensors", () => {
+  it("adds the device check and each device's states with their sensors", () => {
     const ir = irOf("press_feeder.tejun");
-    expect(ir.positionCheck).toEqual({ fault: "POSITION_MISMATCH", debounceMs: 100 });
-    expect(ir.devices[0]!.sensors).toEqual({ extended: "clamp_ext_ls", retracted: "clamp_ret_ls" });
+    expect(ir.deviceCheck).toEqual({ debounceMs: 100 });
+    expect(ir.devices[0]!.states).toEqual({
+      extended: { sensor: "clamp_ext_ls", value: true },
+      retracted: { sensor: "clamp_ret_ls", value: true },
+    });
+    expect(ir.devices[0]!.release).toBeUndefined();
+    expect(ir.devices[0]!.mismatchFault).toBe("POSITION_MISMATCH");
+  });
+
+  it("describes a Motor: run action, running/stopped on one feedback, released when not driven", () => {
+    const ir = irOf("press_station.tejun");
+    const belt = ir.devices.find((d) => d.name === "belt")!;
+    expect(belt.states).toEqual({
+      running: { sensor: "belt_fb", value: true },
+      stopped: { sensor: "belt_fb", value: false },
+    });
+    expect(belt.release).toEqual({ via: "stopping", state: "stopped" });
+    expect(belt.mismatchFault).toBe("FEEDBACK_MISMATCH");
+    const feed = ir.states.find((s) => s.name === "Feed")!;
+    expect(feed.step).toMatchObject({ kind: "device", device: "belt", action: "run", drive: "belt_run", done: "belt_fb", target: "running" });
+    // Both built-in device faults, once each, in device order, after the program's own faults.
+    expect(ir.faults.slice(-2)).toEqual(["FEEDBACK_MISMATCH", "POSITION_MISMATCH"]);
   });
 
   it("keeps every state's transitions pointing at a real state or Stopped", () => {

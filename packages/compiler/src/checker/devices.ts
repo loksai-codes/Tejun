@@ -113,7 +113,7 @@ function checkDeclaration(ctx: CheckContext, device: DeviceSymbol, owners: Map<s
     const noFeedback = missing.some((p) => p.direction === "input");
     const help =
       missing.map((p) => `\`${p.name}\` is ${p.description}`).join("; ") +
-      (noFeedback ? "; without it Tejun cannot confirm that a move finished" : "");
+      (noFeedback ? "; without it Tejun cannot confirm the device's state" : "");
     ctx.error("T0402", decl.name.span, {
       message: `device \`${decl.name.name}\` is missing ${missing.length === 1 ? "parameter" : "parameters"} ${list}`,
       messageJa: `デバイス \`${decl.name.name}\` にパラメータ ${list} がありません`,
@@ -187,14 +187,14 @@ function memberHelp(kind: DeviceKind, name: string, want: "action" | "state"): s
   const actions = Object.keys(kind.actions);
   const states = Object.keys(kind.states);
   if (want === "state" && name in kind.actions) {
-    const done = kind.actions[name]!.done;
-    const state = states.find((s) => kind.states[s] === done);
-    if (state) return `\`${name}\` is an action; the state is \`${state}\``;
+    return `\`${name}\` is an action; the state is \`${kind.actions[name]!.done}\``;
   }
   if (want === "action" && name in kind.states) {
-    const sensor = kind.states[name];
-    const action = actions.find((a) => kind.actions[a]!.done === sensor);
+    const action = actions.find((a) => kind.actions[a]!.done === name);
     if (action) return `\`${name}\` is a state; the action is \`${action}\``;
+    if (kind.release?.state === name) {
+      return `\`${name}\` is a state, not an action: a ${kind.name} is ${name} in every state that does not drive it; to wait for it, write \`when <device>.${name} within … else fault …\``;
+    }
   }
   const options = want === "action" ? actions : states;
   const suggestion = closest(name, options);

@@ -11,7 +11,7 @@
 //   - a timeout raises its fault when its time runs out first
 
 import type * as A from "./ast.js";
-import { DEVICE_KINDS, POSITION_DEBOUNCE_MS, POSITION_MISMATCH } from "./device-kinds.js";
+import { DEVICE_KINDS, MISMATCH_DEBOUNCE_MS } from "./device-kinds.js";
 import type { Span } from "./source.js";
 
 export interface StationIR {
@@ -25,16 +25,17 @@ export interface StationIR {
   states: StateIR[];
   /**
    * Fault codes in order of first appearance; fault number = index + 1. The
-   * built-in POSITION_MISMATCH comes last, so it never renumbers the others.
+   * built-in device faults (POSITION_MISMATCH, FEEDBACK_MISMATCH) come last,
+   * so they never renumber the others.
    */
   faults: string[];
   handlers: HandlersIR;
-  /** Runtime check that devices' sensors agree with their tracked positions; present when the station has devices. */
-  positionCheck: PositionCheckIR | undefined;
+  /** Runtime check that devices' sensors agree with their tracked states; present when the station has devices. */
+  deviceCheck: DeviceCheckIR | undefined;
 }
 
-export interface PositionCheckIR {
-  fault: string;
+export interface DeviceCheckIR {
+  /** How long a disagreement must last before the device's mismatch fault. */
   debounceMs: number;
 }
 
@@ -54,8 +55,34 @@ export interface DeviceIR {
   kind: string;
   /** Parameter name -> signal name, e.g. { extend: "clamp_out", at_ext: "clamp_ext_ls" }. */
   wiring: Record<string, string>;
-  /** Position name -> the input that confirms it, e.g. { extended: "clamp_ext_ls", retracted: "clamp_ret_ls" }. */
-  sensors: Record<string, string>;
+  /** State name -> the input that confirms it and its value, e.g. { stopped: { sensor: "belt_fb", value: false } }. */
+  states: Record<string, { sensor: string; value: boolean }>;
+  /** For a device that acts only while driven (Motor): leaving a state that drives it puts it in `via` until `state` is confirmed. */
+  release: { via: string; state: string } | undefined;
+  /** Built-in fault raised when its sensors disagree with its tracked state. */
+  mismatchFault: string;
+  /** "position" or "state", for messages. */
+  tracked: string;
+}
+
+/**
+ * States a device must be seen leaving when an action toward `target`
+ * starts: those confirmed by a different sensor than `target` (a cylinder
+ * moving to `extended` must release `at_ret`). A motor's states share one
+ * sensor, so it has none.
+ */
+export function departures(device: DeviceIR, target: string): string[] {
+  const sensor = device.states[target]!.sensor;
+  return Object.keys(device.states).filter((s) => device.states[s]!.sensor !== sensor);
+}
+
+/**
+ * States the device check watches being left: those in `departures` of some
+ * state. A device with none (a Motor) needs no record of where a move started.
+ */
+export function departedStates(device: DeviceIR): string[] {
+  const states = Object.keys(device.states);
+  return states.filter((s) => states.some((t) => departures(device, t).includes(s)));
 }
 
 export type InterlockIR =
@@ -79,8 +106,10 @@ export type StepIR =
       action: string;
       /** Output that is ON for the whole state. */
       drive: string;
-      /** Input that confirms the action finished. */
+      /** Input that confirms the action finished (ON; every action's target state is confirmed by an ON input). */
       done: string;
+      /** The device state the action reaches, e.g. `extended`, `running`. */
+      target: string;
       timeout: TimeoutIR;
       span: Span;
     }
@@ -156,7 +185,7 @@ export function buildIR(program: A.Program): StationIR {
       case "MemberRef": {
         const device = devices.get(e.object.name)!;
         const kind = DEVICE_KINDS.get(device.deviceKind.name)!;
-        const param = kind.states[e.member.name]!;
+        const param = kind.states[e.member.name]!.sensor;
         return { kind: "device_state", device: device.name.name, state: e.member.name, sensor: wiringOf(device)[param]! };
       }
       case "Quantity":
@@ -207,7 +236,8 @@ export function buildIR(program: A.Program): StationIR {
             device: s.device.name,
             action: s.action.name,
             drive: wiring[action.drive]!,
-            done: wiring[action.done]!,
+            done: wiring[DEVICE_KINDS.get(device.deviceKind.name)!.states[action.done]!.sensor]!,
+            target: action.done,
             timeout: timeout(s.timeout!),
             span: s.span,
           };
@@ -255,18 +285,30 @@ export function buildIR(program: A.Program): StationIR {
     devices: st.devices.map((d) => {
       const wiring = wiringOf(d);
       const kind = DEVICE_KINDS.get(d.deviceKind.name)!;
-      const sensors = Object.fromEntries(Object.entries(kind.states).map(([pos, param]) => [pos, wiring[param]!]));
-      return { name: d.name.name, kind: d.deviceKind.name, wiring, sensors };
+      const states = Object.fromEntries(
+        Object.entries(kind.states).map(([name, s]) => [name, { sensor: wiring[s.sensor]!, value: s.value }]),
+      );
+      return {
+        name: d.name.name,
+        kind: d.deviceKind.name,
+        wiring,
+        states,
+        release: kind.release ? { ...kind.release } : undefined,
+        mismatchFault: kind.mismatchFault,
+        tracked: kind.tracked,
+      };
     }),
     interlocks,
     initialState: st.sequence.states[0]!.name.name,
     states,
     faults: [
-      ...new Set(faults.sort((a, b) => a.at - b.at).map((f) => f.name)),
-      ...(st.devices.length > 0 ? [POSITION_MISMATCH] : []),
+      ...new Set([
+        ...faults.sort((a, b) => a.at - b.at).map((f) => f.name),
+        ...st.devices.map((d) => DEVICE_KINDS.get(d.deviceKind.name)!.mismatchFault),
+      ]),
     ],
     handlers,
-    positionCheck: st.devices.length > 0 ? { fault: POSITION_MISMATCH, debounceMs: POSITION_DEBOUNCE_MS } : undefined,
+    deviceCheck: st.devices.length > 0 ? { debounceMs: MISMATCH_DEBOUNCE_MS } : undefined,
   };
 }
 

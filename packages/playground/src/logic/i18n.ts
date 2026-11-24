@@ -100,7 +100,10 @@ function causeJa(c: FaultCause): string {
       return `${c.ms} ms 以内に遷移しません`;
     case "monitor":
       return `${c.condition} が偽です`;
-    case "position":
-      return `${c.device} のセンサ (${sensorList(c.sensors)}) が記録上の位置 (${c.position.replace(/^moving from (\w+)$/, "$1 から移動中")}) と ${c.ms} ms 一致しません`;
+    case "mismatch": {
+      const tracked = c.tracked === "position" ? "位置" : "状態";
+      const state = c.state.replace(/^moving from (\w+)$/, "$1 から移動中");
+      return `${c.device} のセンサ (${sensorList(c.sensors)}) が記録上の${tracked} (${state}) と ${c.ms} ms 一致しません`;
+    }
   }
 }

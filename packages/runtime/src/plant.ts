@@ -6,10 +6,17 @@
 // OFF) it travels toward extended; after `travelMs` the extended sensor turns
 // ON. Leaving an end turns that end's sensor OFF. With both outputs OFF it
 // holds its position, like a double-acting valve.
+//
+// Motor: starts at standstill. While its run output is ON its speed ramps up
+// to full over `startMs`; while OFF it coasts down to standstill over
+// `rundownMs`. The feedback is a speed monitor: it turns ON at full speed and
+// OFF only at standstill.
 
 import type { StationIR } from "@tejun/compiler";
 
 export const DEFAULT_TRAVEL_MS = 300;
+export const MOTOR_START_MS = 300;
+export const MOTOR_RUNDOWN_MS = 500;
 
 interface Cylinder {
   device: string;
@@ -21,11 +28,22 @@ interface Cylinder {
   progress: number;
 }
 
+interface Motor {
+  device: string;
+  run: string;
+  feedback: string;
+  /** 0 = standstill, 1 = full speed. */
+  speed: number;
+  /** Speed monitor output, with hysteresis: ON at full speed, OFF at standstill. */
+  fb: boolean;
+}
+
 export class Plant {
   readonly travelMs: number;
   /** Sensor name -> the device that drives it. */
   readonly owned: ReadonlyMap<string, string>;
   private readonly cylinders: Cylinder[];
+  private readonly motors: Motor[];
 
   constructor(ir: StationIR, travelMs = DEFAULT_TRAVEL_MS) {
     this.travelMs = travelMs;
@@ -39,7 +57,13 @@ export class Plant {
         atRet: d.wiring.at_ret!,
         progress: 0,
       }));
-    this.owned = new Map(this.cylinders.flatMap((c) => [[c.atExt, c.device], [c.atRet, c.device]] as const));
+    this.motors = ir.devices
+      .filter((d) => d.kind === "Motor")
+      .map((d) => ({ device: d.name, run: d.wiring.run!, feedback: d.wiring.feedback!, speed: 0, fb: false }));
+    this.owned = new Map([
+      ...this.cylinders.flatMap((c) => [[c.atExt, c.device], [c.atRet, c.device]] as const),
+      ...this.motors.map((m) => [m.feedback, m.device] as const),
+    ]);
   }
 
   /** Current values of every device-driven sensor. */
@@ -49,12 +73,19 @@ export class Plant {
       out[c.atExt] = c.progress >= this.travelMs;
       out[c.atRet] = c.progress <= 0;
     }
+    for (const m of this.motors) out[m.feedback] = m.fb;
     return out;
   }
 
-  /** Device name -> how far it is extended, from 0 (retracted) to 1 (extended). */
+  /**
+   * Device name -> a cylinder's extension, from 0 (retracted) to 1
+   * (extended), or a motor's speed, from 0 (standstill) to 1 (full speed).
+   */
   positions(): Record<string, number> {
-    return Object.fromEntries(this.cylinders.map((c) => [c.device, c.progress / this.travelMs]));
+    return Object.fromEntries([
+      ...this.cylinders.map((c) => [c.device, c.progress / this.travelMs] as const),
+      ...this.motors.map((m) => [m.device, m.speed] as const),
+    ]);
   }
 
   /**
@@ -74,6 +105,12 @@ export class Plant {
       const ret = outputs[c.retract] === true;
       if (ext && !ret) c.progress = Math.min(this.travelMs, c.progress + dtMs);
       if (ret && !ext) c.progress = Math.max(0, c.progress - dtMs);
+    }
+    for (const m of this.motors) {
+      if (outputs[m.run] === true) m.speed = Math.min(1, m.speed + dtMs / MOTOR_START_MS);
+      else m.speed = Math.max(0, m.speed - dtMs / MOTOR_RUNDOWN_MS);
+      if (m.speed >= 1) m.fb = true;
+      if (m.speed <= 0) m.fb = false;
     }
   }
 }

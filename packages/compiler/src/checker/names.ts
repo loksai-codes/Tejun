@@ -2,7 +2,7 @@
 // Runs first and fills the symbol table the other passes use.
 
 import type * as A from "../ast.js";
-import { DEVICE_KINDS, POSITION_MISMATCH } from "../device-kinds.js";
+import { BUILTIN_FAULTS, DEVICE_KINDS } from "../device-kinds.js";
 import { closest } from "../suggest.js";
 import { STOPPED, conditionSites, timeouts, walkExpr, type CheckContext } from "./context.js";
 
@@ -14,7 +14,7 @@ export function checkNames(ctx: CheckContext): void {
   resolveReferences(ctx);
 }
 
-/** POSITION_MISMATCH is raised by the built-in device position check only. */
+/** POSITION_MISMATCH and FEEDBACK_MISMATCH are raised by the built-in device check only. */
 function checkFaultNames(ctx: CheckContext): void {
   const st = ctx.station;
   const faults: A.Ident[] = [
@@ -22,12 +22,12 @@ function checkFaultNames(ctx: CheckContext): void {
     ...timeouts(st).flatMap((t) => (t.kind === "WithinTimeout" ? [t.fault] : [])),
   ];
   for (const fault of faults) {
-    if (fault.name !== POSITION_MISMATCH) continue;
+    if (!BUILTIN_FAULTS.includes(fault.name)) continue;
     ctx.error("T0102", fault.span, {
-      message: `\`${POSITION_MISMATCH}\` is a built-in fault and cannot be raised by the program`,
-      messageJa: `\`${POSITION_MISMATCH}\` は組み込みの故障のため、プログラムから発生させることはできません`,
+      message: `\`${fault.name}\` is a built-in fault and cannot be raised by the program`,
+      messageJa: `\`${fault.name}\` は組み込みの故障のため、プログラムから発生させることはできません`,
       label: "built-in fault",
-      help: "it is raised automatically when a device's sensors disagree with its tracked position; choose another name for this fault",
+      help: "it is raised automatically when a device's sensors disagree with its tracked state; choose another name for this fault",
     });
   }
 }

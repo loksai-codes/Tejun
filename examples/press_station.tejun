@@ -1,0 +1,66 @@
+// Press station: a belt brings each part up to a stop, a clamp holds it, a
+// ram presses it until the load cell reads the pressing force, then the
+// belt carries the part away and brings the next one.
+//
+// The belt is a Motor with a speed monitor: its feedback is ON at speed and
+// OFF only at standstill, so `belt.stopped` means the belt has really stopped,
+// not just that its contactor has dropped out. The clamp and the ram are
+// double-acting Cylinders.
+station PressStation "プレスステーション" {
+  io {
+    input  part_at_stop : bool     @ %IX0.0  "ストッパ前ワーク検出"
+    input  belt_fb      : bool     @ %IX0.1  "ベルト回転検出"
+    input  clamp_ext_ls : bool     @ %IX0.2  "クランプ前進端"
+    input  clamp_ret_ls : bool     @ %IX0.3  "クランプ後退端"
+    input  ram_down_ls  : bool     @ %IX0.4  "ラム下降端"
+    input  ram_up_ls    : bool     @ %IX0.5  "ラム上昇端"
+    input  exit_eye     : bool     @ %IX0.6  "排出センサ"
+    input  estop_ok     : bool     @ %IX0.7  "非常停止OK" safety
+    input  press_force  : real<kN> @ %IW2    "プレス荷重" range 0..100
+    output belt_run     : bool     @ %QX0.0  "ベルト運転"
+    output clamp_out    : bool     @ %QX0.1  "クランプ前進"
+    output clamp_in     : bool     @ %QX0.2  "クランプ後退"
+    output ram_down     : bool     @ %QX0.3  "ラム下降"
+    output ram_up       : bool     @ %QX0.4  "ラム上昇"
+    output done_lamp    : bool     @ %QX0.5  "完了ランプ"
+  }
+
+  device belt  : Motor(run: belt_run, feedback: belt_fb)
+  device clamp : Cylinder(extend: clamp_out, retract: clamp_in,
+                          at_ext: clamp_ext_ls, at_ret: clamp_ret_ls)
+  device ram   : Cylinder(extend: ram_down, retract: ram_up,
+                          at_ext: ram_down_ls, at_ret: ram_up_ls)
+
+  // The belt may only move with the clamp open and the ram up.
+  interlock belt_run requires clamp.retracted and ram.retracted
+  // The ram may only come down on a clamped part, with the belt at standstill.
+  interlock ram_down requires clamp.extended and belt.stopped
+  interlock never (ram_down and ram_up)
+  // Above 80 kN something is wrong (a double part, a tool crash): stop.
+  interlock press_force < 80 kN else fault OVERLOAD
+
+  sequence main {
+    // Home: ram up first, so the clamp never opens under a lowered ram.
+    state HomeRam   { ram.retract within 3 s else fault RAM_HOME_TIMEOUT; -> HomeClamp }
+    state HomeClamp { clamp.retract within 2 s else fault CLAMP_HOME_TIMEOUT; -> Feed }
+
+    // Run the belt until a part reaches the stop, then wait for standstill.
+    state Feed      { belt.run within 1 s else fault BELT_NO_START;
+                      when part_at_stop within 10 s else fault FEED_TIMEOUT -> Settle }
+    state Settle    { when belt.stopped within 2 s else fault BELT_NO_STOP -> Clamp }
+
+    // Clamp, then press until the load cell reaches the pressing force.
+    state Clamp     { clamp.extend within 2 s else fault CLAMP_TIMEOUT; -> Press }
+    state Press     { ram.extend within 3 s else fault PRESS_TIMEOUT;
+                      when press_force >= 40 kN within 2 s else fault NO_FORCE -> RamUp }
+    state RamUp     { ram.retract within 3 s else fault RAM_UP_TIMEOUT; -> Unclamp }
+    state Unclamp   { clamp.retract within 2 s else fault UNCLAMP_TIMEOUT; -> Eject }
+
+    // Carry the pressed part out; the next one follows on the same belt.
+    state Eject     { done_lamp on; belt.run within 1 s else fault BELT_NO_START;
+                      when exit_eye within 5 s else fault EJECT_TIMEOUT -> Feed }
+  }
+
+  on fault        { outputs safe; -> Stopped }
+  on not estop_ok { outputs safe; -> Stopped }
+}

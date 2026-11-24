@@ -1,0 +1,543 @@
+{
+  "name": "PressStation",
+  "label": "プレスステーション",
+  "signals": [
+    {
+      "name": "part_at_stop",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.0",
+      "label": "ストッパ前ワーク検出",
+      "safety": false
+    },
+    {
+      "name": "belt_fb",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.1",
+      "label": "ベルト回転検出",
+      "safety": false
+    },
+    {
+      "name": "clamp_ext_ls",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.2",
+      "label": "クランプ前進端",
+      "safety": false
+    },
+    {
+      "name": "clamp_ret_ls",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.3",
+      "label": "クランプ後退端",
+      "safety": false
+    },
+    {
+      "name": "ram_down_ls",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.4",
+      "label": "ラム下降端",
+      "safety": false
+    },
+    {
+      "name": "ram_up_ls",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.5",
+      "label": "ラム上昇端",
+      "safety": false
+    },
+    {
+      "name": "exit_eye",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.6",
+      "label": "排出センサ",
+      "safety": false
+    },
+    {
+      "name": "estop_ok",
+      "direction": "input",
+      "type": "bool",
+      "address": "%IX0.7",
+      "label": "非常停止OK",
+      "safety": true
+    },
+    {
+      "name": "press_force",
+      "direction": "input",
+      "type": "real",
+      "unit": "kN",
+      "address": "%IW2",
+      "label": "プレス荷重",
+      "safety": false,
+      "range": {
+        "min": 0,
+        "max": 100
+      }
+    },
+    {
+      "name": "belt_run",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.0",
+      "label": "ベルト運転",
+      "safety": false
+    },
+    {
+      "name": "clamp_out",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.1",
+      "label": "クランプ前進",
+      "safety": false
+    },
+    {
+      "name": "clamp_in",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.2",
+      "label": "クランプ後退",
+      "safety": false
+    },
+    {
+      "name": "ram_down",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.3",
+      "label": "ラム下降",
+      "safety": false
+    },
+    {
+      "name": "ram_up",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.4",
+      "label": "ラム上昇",
+      "safety": false
+    },
+    {
+      "name": "done_lamp",
+      "direction": "output",
+      "type": "bool",
+      "address": "%QX0.5",
+      "label": "完了ランプ",
+      "safety": false
+    }
+  ],
+  "devices": [
+    {
+      "name": "belt",
+      "kind": "Motor",
+      "wiring": {
+        "run": "belt_run",
+        "feedback": "belt_fb"
+      },
+      "states": {
+        "running": {
+          "sensor": "belt_fb",
+          "value": true
+        },
+        "stopped": {
+          "sensor": "belt_fb",
+          "value": false
+        }
+      },
+      "release": {
+        "via": "stopping",
+        "state": "stopped"
+      },
+      "mismatchFault": "FEEDBACK_MISMATCH",
+      "tracked": "state"
+    },
+    {
+      "name": "clamp",
+      "kind": "Cylinder",
+      "wiring": {
+        "extend": "clamp_out",
+        "retract": "clamp_in",
+        "at_ext": "clamp_ext_ls",
+        "at_ret": "clamp_ret_ls"
+      },
+      "states": {
+        "extended": {
+          "sensor": "clamp_ext_ls",
+          "value": true
+        },
+        "retracted": {
+          "sensor": "clamp_ret_ls",
+          "value": true
+        }
+      },
+      "mismatchFault": "POSITION_MISMATCH",
+      "tracked": "position"
+    },
+    {
+      "name": "ram",
+      "kind": "Cylinder",
+      "wiring": {
+        "extend": "ram_down",
+        "retract": "ram_up",
+        "at_ext": "ram_down_ls",
+        "at_ret": "ram_up_ls"
+      },
+      "states": {
+        "extended": {
+          "sensor": "ram_down_ls",
+          "value": true
+        },
+        "retracted": {
+          "sensor": "ram_up_ls",
+          "value": true
+        }
+      },
+      "mismatchFault": "POSITION_MISMATCH",
+      "tracked": "position"
+    }
+  ],
+  "interlocks": [
+    {
+      "kind": "requires",
+      "output": "belt_run",
+      "condition": {
+        "kind": "and",
+        "left": {
+          "kind": "device_state",
+          "device": "clamp",
+          "state": "retracted",
+          "sensor": "clamp_ret_ls"
+        },
+        "right": {
+          "kind": "device_state",
+          "device": "ram",
+          "state": "retracted",
+          "sensor": "ram_up_ls"
+        }
+      }
+    },
+    {
+      "kind": "requires",
+      "output": "ram_down",
+      "condition": {
+        "kind": "and",
+        "left": {
+          "kind": "device_state",
+          "device": "clamp",
+          "state": "extended",
+          "sensor": "clamp_ext_ls"
+        },
+        "right": {
+          "kind": "device_state",
+          "device": "belt",
+          "state": "stopped",
+          "sensor": "belt_fb"
+        }
+      }
+    },
+    {
+      "kind": "never",
+      "condition": {
+        "kind": "and",
+        "left": {
+          "kind": "signal",
+          "name": "ram_down"
+        },
+        "right": {
+          "kind": "signal",
+          "name": "ram_up"
+        }
+      }
+    },
+    {
+      "kind": "condition",
+      "condition": {
+        "kind": "compare",
+        "op": "<",
+        "left": {
+          "kind": "signal",
+          "name": "press_force"
+        },
+        "right": {
+          "kind": "number",
+          "value": 80,
+          "unit": "kN"
+        }
+      },
+      "fault": "OVERLOAD"
+    }
+  ],
+  "initialState": "HomeRam",
+  "states": [
+    {
+      "name": "HomeRam",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "ram",
+        "action": "retract",
+        "drive": "ram_up",
+        "done": "ram_up_ls",
+        "target": "retracted",
+        "timeout": {
+          "kind": "within",
+          "ms": 3000,
+          "fault": "RAM_HOME_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "HomeClamp"
+        }
+      ]
+    },
+    {
+      "name": "HomeClamp",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "clamp",
+        "action": "retract",
+        "drive": "clamp_in",
+        "done": "clamp_ret_ls",
+        "target": "retracted",
+        "timeout": {
+          "kind": "within",
+          "ms": 2000,
+          "fault": "CLAMP_HOME_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Feed"
+        }
+      ]
+    },
+    {
+      "name": "Feed",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "belt",
+        "action": "run",
+        "drive": "belt_run",
+        "done": "belt_fb",
+        "target": "running",
+        "timeout": {
+          "kind": "within",
+          "ms": 1000,
+          "fault": "BELT_NO_START"
+        }
+      },
+      "transitions": [
+        {
+          "condition": {
+            "kind": "signal",
+            "name": "part_at_stop"
+          },
+          "target": "Settle",
+          "timeout": {
+            "kind": "within",
+            "ms": 10000,
+            "fault": "FEED_TIMEOUT"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Settle",
+      "outputs": [],
+      "transitions": [
+        {
+          "condition": {
+            "kind": "device_state",
+            "device": "belt",
+            "state": "stopped",
+            "sensor": "belt_fb"
+          },
+          "target": "Clamp",
+          "timeout": {
+            "kind": "within",
+            "ms": 2000,
+            "fault": "BELT_NO_STOP"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Clamp",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "clamp",
+        "action": "extend",
+        "drive": "clamp_out",
+        "done": "clamp_ext_ls",
+        "target": "extended",
+        "timeout": {
+          "kind": "within",
+          "ms": 2000,
+          "fault": "CLAMP_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Press"
+        }
+      ]
+    },
+    {
+      "name": "Press",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "ram",
+        "action": "extend",
+        "drive": "ram_down",
+        "done": "ram_down_ls",
+        "target": "extended",
+        "timeout": {
+          "kind": "within",
+          "ms": 3000,
+          "fault": "PRESS_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "condition": {
+            "kind": "compare",
+            "op": ">=",
+            "left": {
+              "kind": "signal",
+              "name": "press_force"
+            },
+            "right": {
+              "kind": "number",
+              "value": 40,
+              "unit": "kN"
+            }
+          },
+          "target": "RamUp",
+          "timeout": {
+            "kind": "within",
+            "ms": 2000,
+            "fault": "NO_FORCE"
+          }
+        }
+      ]
+    },
+    {
+      "name": "RamUp",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "ram",
+        "action": "retract",
+        "drive": "ram_up",
+        "done": "ram_up_ls",
+        "target": "retracted",
+        "timeout": {
+          "kind": "within",
+          "ms": 3000,
+          "fault": "RAM_UP_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Unclamp"
+        }
+      ]
+    },
+    {
+      "name": "Unclamp",
+      "outputs": [],
+      "step": {
+        "kind": "device",
+        "device": "clamp",
+        "action": "retract",
+        "drive": "clamp_in",
+        "done": "clamp_ret_ls",
+        "target": "retracted",
+        "timeout": {
+          "kind": "within",
+          "ms": 2000,
+          "fault": "UNCLAMP_TIMEOUT"
+        }
+      },
+      "transitions": [
+        {
+          "target": "Eject"
+        }
+      ]
+    },
+    {
+      "name": "Eject",
+      "outputs": [
+        "done_lamp"
+      ],
+      "step": {
+        "kind": "device",
+        "device": "belt",
+        "action": "run",
+        "drive": "belt_run",
+        "done": "belt_fb",
+        "target": "running",
+        "timeout": {
+          "kind": "within",
+          "ms": 1000,
+          "fault": "BELT_NO_START"
+        }
+      },
+      "transitions": [
+        {
+          "condition": {
+            "kind": "signal",
+            "name": "exit_eye"
+          },
+          "target": "Feed",
+          "timeout": {
+            "kind": "within",
+            "ms": 5000,
+            "fault": "EJECT_TIMEOUT"
+          }
+        }
+      ]
+    }
+  ],
+  "faults": [
+    "OVERLOAD",
+    "RAM_HOME_TIMEOUT",
+    "CLAMP_HOME_TIMEOUT",
+    "BELT_NO_START",
+    "FEED_TIMEOUT",
+    "BELT_NO_STOP",
+    "CLAMP_TIMEOUT",
+    "PRESS_TIMEOUT",
+    "NO_FORCE",
+    "RAM_UP_TIMEOUT",
+    "UNCLAMP_TIMEOUT",
+    "EJECT_TIMEOUT",
+    "FEEDBACK_MISMATCH",
+    "POSITION_MISMATCH"
+  ],
+  "handlers": {
+    "onFault": "Stopped",
+    "conditions": [
+      {
+        "condition": {
+          "kind": "not",
+          "operand": {
+            "kind": "signal",
+            "name": "estop_ok"
+          }
+        },
+        "target": "Stopped"
+      }
+    ]
+  },
+  "deviceCheck": {
+    "debounceMs": 100
+  }
+}

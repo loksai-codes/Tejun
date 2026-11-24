@@ -1,0 +1,8 @@
+error[T0405]: Motor has no action `stopped`
+  --> tests/fixtures/errors/T0405_wait_on_stopped_as_action.tejun:15:25
+   |
+15 |     state Settle { belt.stopped within 2 s else fault BELT_NO_STOP; -> Press }
+   |                         ^^^^^^^ unknown action
+   |
+   = help: `stopped` is a state, not an action: a Motor is stopped in every state that does not drive it; to wait for it, write `when <device>.stopped within … else fault …`
+   = 日本語: Motor に動作 `stopped` はありません

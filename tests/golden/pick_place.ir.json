@@ -109,10 +109,18 @@
         "at_ext": "z_down_ls",
         "at_ret": "z_up_ls"
       },
-      "sensors": {
-        "extended": "z_down_ls",
-        "retracted": "z_up_ls"
-      }
+      "states": {
+        "extended": {
+          "sensor": "z_down_ls",
+          "value": true
+        },
+        "retracted": {
+          "sensor": "z_up_ls",
+          "value": true
+        }
+      },
+      "mismatchFault": "POSITION_MISMATCH",
+      "tracked": "position"
     },
     {
       "name": "x",
@@ -123,10 +131,18 @@
         "at_ext": "x_out_ls",
         "at_ret": "x_home_ls"
       },
-      "sensors": {
-        "extended": "x_out_ls",
-        "retracted": "x_home_ls"
-      }
+      "states": {
+        "extended": {
+          "sensor": "x_out_ls",
+          "value": true
+        },
+        "retracted": {
+          "sensor": "x_home_ls",
+          "value": true
+        }
+      },
+      "mismatchFault": "POSITION_MISMATCH",
+      "tracked": "position"
     }
   ],
   "interlocks": [
@@ -178,6 +194,7 @@
         "action": "extend",
         "drive": "z_down",
         "done": "z_down_ls",
+        "target": "extended",
         "timeout": {
           "kind": "within",
           "ms": 1000,
@@ -221,6 +238,7 @@
         "action": "retract",
         "drive": "z_up",
         "done": "z_up_ls",
+        "target": "retracted",
         "timeout": {
           "kind": "within",
           "ms": 1000,
@@ -244,6 +262,7 @@
         "action": "extend",
         "drive": "x_out",
         "done": "x_out_ls",
+        "target": "extended",
         "timeout": {
           "kind": "within",
           "ms": 2000,
@@ -267,6 +286,7 @@
         "action": "extend",
         "drive": "z_down",
         "done": "z_down_ls",
+        "target": "extended",
         "timeout": {
           "kind": "within",
           "ms": 1000,
@@ -309,6 +329,7 @@
         "action": "retract",
         "drive": "z_up",
         "done": "z_up_ls",
+        "target": "retracted",
         "timeout": {
           "kind": "within",
           "ms": 1000,
@@ -330,6 +351,7 @@
         "action": "retract",
         "drive": "x_home",
         "done": "x_home_ls",
+        "target": "retracted",
         "timeout": {
           "kind": "within",
           "ms": 2000,
@@ -367,8 +389,7 @@
       }
     ]
   },
-  "positionCheck": {
-    "fault": "POSITION_MISMATCH",
+  "deviceCheck": {
     "debounceMs": 100
   }
 }

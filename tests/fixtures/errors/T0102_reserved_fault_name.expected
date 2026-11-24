@@ -4,5 +4,5 @@ error[T0102]: `POSITION_MISMATCH` is a built-in fault and cannot be raised by th
 21 |     state Release { clamp.retract within 2 s else fault POSITION_MISMATCH; -> Idle }
    |                                                         ^^^^^^^^^^^^^^^^^ built-in fault
    |
-   = help: it is raised automatically when a device's sensors disagree with its tracked position; choose another name for this fault
+   = help: it is raised automatically when a device's sensors disagree with its tracked state; choose another name for this fault
    = 日本語: `POSITION_MISMATCH` は組み込みの故障のため、プログラムから発生させることはできません

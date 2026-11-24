@@ -21,7 +21,7 @@ function memoryIo(files: Record<string, string>): CliIo & { written: Map<string,
 
 const example = (name: string) => readFileSync(new URL(`../examples/${name}`, import.meta.url), "utf8");
 const golden = (name: string) => readFileSync(new URL(`./golden/${name}`, import.meta.url), "utf8");
-const EXAMPLES = ["press_feeder.tejun", "conveyor_sorter.tejun", "pick_place.tejun"];
+const EXAMPLES = ["press_feeder.tejun", "conveyor_sorter.tejun", "pick_place.tejun", "press_station.tejun"];
 
 describe("tejun check", () => {
   it.each(EXAMPLES)("prints OK for examples/%s", (name) => {
@@ -144,6 +144,14 @@ describe("tejun run", () => {
     expect(result.stdout).toContain("FAULT 3 CLAMP_TIMEOUT: clamp_ext_ls not ON within 2000 ms");
     expect(result.stdout).toContain("Clamp -> Stopped                   outputs: all OFF");
     expectGolden(result.stdout, "press_feeder.jam_clamp_ext_ls.timeline.txt");
+  });
+
+  it("shows a motor whose feedback never comes on raising its start timeout", () => {
+    const result = runCli(["run", "examples/press_station.tejun", "--jam", "belt_fb"], withScenario("press_station.tejun"));
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("FAULT 4 BELT_NO_START: belt_fb not ON within 1000 ms");
+    expect(result.stdout).toContain("Feed -> Stopped                    outputs: all OFF");
+    expectGolden(result.stdout, "press_station.jam_belt_fb.timeline.txt");
   });
 
   it("runs without a scenario when none exists next to the program", () => {

@@ -13,7 +13,7 @@ export {
   type ScanResult,
   type FaultCause,
 } from "./station.js";
-export { Plant, DEFAULT_TRAVEL_MS } from "./plant.js";
+export { Plant, DEFAULT_TRAVEL_MS, MOTOR_START_MS, MOTOR_RUNDOWN_MS } from "./plant.js";
 export {
   parseScenario,
   parseTime,

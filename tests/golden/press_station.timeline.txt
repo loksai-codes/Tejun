@@ -1,0 +1,33 @@
+PressStation プレスステーション · scenario examples/press_station.scenario · scan 20 ms
+   time  event
+  0.000  start in HomeRam                   outputs: ram_up
+  0.000  clamp_ret_ls ON (clamp)
+  0.000  ram_up_ls ON (ram)
+  0.000  estop_ok ON (default)
+  0.020  HomeRam -> HomeClamp               outputs: clamp_in
+  0.060  HomeClamp -> Feed                  outputs: belt_run
+  0.380  belt_fb ON (belt)
+  1.560  part_at_stop ON (follows belt_run)
+  1.560  Feed -> Settle                     outputs: all OFF
+  2.060  belt_fb OFF (belt)
+  2.060  Settle -> Clamp                    outputs: clamp_out
+  2.080  clamp_ret_ls OFF (clamp)
+  2.360  clamp_ext_ls ON (clamp)
+  2.380  Clamp -> Press                     outputs: ram_down
+  2.400  ram_up_ls OFF (ram)
+  2.500  press_force = 45 kN (scenario)
+  2.680  ram_down_ls ON (ram)
+  2.700  Press -> RamUp                     outputs: ram_up
+  2.720  ram_down_ls OFF (ram)
+  3.000  ram_up_ls ON (ram)
+  3.000  press_force = 0 kN (scenario)
+  3.020  RamUp -> Unclamp                   outputs: clamp_in
+  3.040  clamp_ext_ls OFF (clamp)
+  3.060  part_at_stop OFF (follows belt_run)
+  3.320  clamp_ret_ls ON (clamp)
+  3.340  Unclamp -> Eject                   outputs: belt_run, done_lamp
+  3.660  belt_fb ON (belt)
+  4.140  exit_eye ON (follows done_lamp)
+  4.140  Eject -> Feed                      outputs: belt_run
+end at 4.500 s: Feed (time limit)
+終了 4.500 秒: Feed (時間制限)

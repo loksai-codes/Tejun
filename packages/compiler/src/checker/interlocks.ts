@@ -6,9 +6,13 @@
 //   - every free input is true or false: bool inputs that the logic reads,
 //     and each comparison on a real input (e.g. `press_force < 40 kN`)
 //   - the state's timer is either done or not done
-//   - device positions are tracked, not read from sensors: a device is
-//     "moving" while its action runs, takes the action's position when the
-//     done sensor confirms it, and is "unknown" at startup
+//   - device states are tracked, not read from sensors: a device is
+//     "moving" while its action runs, takes the action's state when the
+//     done sensor confirms it, and is "unknown" at startup. A device that
+//     acts only while driven (Motor) is put in its release's `via` state
+//     ("stopping") by every state that does not drive it, and reaches the
+//     release state ("stopped") at the start of a scan whose sensor
+//     confirms it; its sensor is always a free input
 //   - E-stop handlers and runtime monitors (`<cond> else fault`) can stop
 //     the machine; in Stopped every output is OFF
 //   - outputs are written at the end of the scan, so an interlock is checked
@@ -16,7 +20,7 @@
 // `never` and `requires` interlocks are proved; `<cond> else fault`
 // interlocks are runtime monitors and are not part of the proof.
 //
-// The device position check (POSITION_MISMATCH) is not modelled separately:
+// The device check (POSITION_MISMATCH, FEEDBACK_MISMATCH) is not modelled separately:
 // all it can do is stop the machine, and every station has an E-stop handler
 // whose input is free here, so "stop in any scan" is already explored. The
 // check is what makes tracked positions trustworthy at runtime; see
@@ -140,6 +144,7 @@ class Model {
       if (s.step?.kind === "device") atoms.add(s.step.done);
       for (const t of s.transitions) if (t.condition) visit(t.condition);
     }
+    for (const d of this.ir.devices) if (d.release) atoms.add(d.states[d.release.state]!.sensor);
     return [...atoms];
   }
 
@@ -170,16 +175,42 @@ class Model {
   /** The configuration on entering a state. */
   enter(name: string, pos: Record<string, string>): Config {
     const state = this.states.get(name);
-    if (!state) return { state: STOPPED, phase: "wait", pos };
-    if (!state.step) return { state: name, phase: "wait", pos };
-    if (state.step.kind === "device") return { state: name, phase: "step", pos: { ...pos, [state.step.device]: MOVING } };
-    return { state: name, phase: "step", pos };
+    const driven = state?.step?.kind === "device" ? state.step.device : undefined;
+    const released = this.release(pos, driven);
+    if (!state) return { state: STOPPED, phase: "wait", pos: released };
+    if (!state.step) return { state: name, phase: "wait", pos: released };
+    if (state.step.kind === "device") return { state: name, phase: "step", pos: { ...released, [state.step.device]: MOVING } };
+    return { state: name, phase: "step", pos: released };
+  }
+
+  /** Devices that act only while driven, and are not driven by the state being entered, start to release. */
+  private release(pos: Record<string, string>, driven: string | undefined): Record<string, string> {
+    const out = { ...pos };
+    for (const d of this.ir.devices) {
+      if (!d.release || d.name === driven) continue;
+      const p = out[d.name]!;
+      if (p === MOVING || (p in d.states && p !== d.release.state)) out[d.name] = d.release.via;
+    }
+    return out;
+  }
+
+  /** At the start of a scan: a releasing (or unknown) device whose sensor confirms its release state reaches it. */
+  private confirmReleases(c: Config, a: Assignment): Config {
+    let pos = c.pos;
+    for (const d of this.ir.devices) {
+      if (!d.release) continue;
+      const p = pos[d.name];
+      const { sensor, value } = d.states[d.release.state]!;
+      if ((p === UNKNOWN || p === d.release.via) && a.get(sensor) === value) pos = { ...pos, [d.name]: d.release.state };
+    }
+    return pos === c.pos ? c : { ...c, pos };
   }
 
   /** One scan. Mirrors the order of the generated Structured Text. */
-  step(c: Config, a: Assignment, timerDone: boolean): Config {
-    if (c.state === STOPPED) return c;
-    const stopped: Config = { state: STOPPED, phase: "wait", pos: c.pos };
+  step(start: Config, a: Assignment, timerDone: boolean): Config {
+    if (start.state === STOPPED) return start;
+    const c = this.confirmReleases(start, a);
+    const stopped: Config = this.enter(STOPPED, c.pos);
     for (const i of this.ir.interlocks) {
       if (i.kind === "condition" && !this.truth(i.condition, c, a)) return stopped;
     }
@@ -191,7 +222,7 @@ class Model {
     if (c.phase === "step" && state.step) {
       const step = state.step;
       if (step.kind === "hold") return timerDone ? { ...c, phase: "wait" } : c;
-      if (a.get(step.done)) return { ...c, phase: "wait", pos: { ...c.pos, [step.device]: this.positionAfter(step.device, step.action) } };
+      if (a.get(step.done)) return { ...c, phase: "wait", pos: { ...c.pos, [step.device]: step.target } };
       return timerDone && step.timeout.kind === "within" ? stopped : c;
     }
 
@@ -211,12 +242,6 @@ class Model {
   outputsOn(c: Config): Set<string> {
     const state = this.states.get(c.state);
     return new Set(state ? outputsOn(state) : []);
-  }
-
-  positionAfter(device: string, action: string): string {
-    const kind = DEVICE_KINDS.get(this.ir.devices.find((d) => d.name === device)!.kind)!;
-    const done = kind.actions[action]!.done;
-    return Object.keys(kind.states).find((s) => kind.states[s] === done)!;
   }
 
   truth(e: ExprIR, c: Config, a: Assignment): boolean {
@@ -313,8 +338,14 @@ function violation(
       ? deviceStates(interlock.condition).find((d) => c.pos[d.device] !== d.state)
       : undefined;
   const onInCondition = [...new Set(outputsIn(interlock.condition))].filter((o) => on.has(o));
+  const deviceIR = device ? ir.devices.find((d) => d.name === device.device) : undefined;
+  const releasing = deviceIR?.release && deviceIR.release.state === device?.state ? deviceIR.release : undefined;
   let help: string;
-  if (device && c.pos[device.device] === UNKNOWN) {
+  if (device && releasing && (c.pos[device.device] === releasing.via || c.pos[device.device] === UNKNOWN)) {
+    const what = c.pos[device.device] === UNKNOWN ? `is not confirmed ${releasing.state}` : `may still be ${releasing.via}`;
+    const wait = `Wait${device.device[0]!.toUpperCase()}${device.device.slice(1)}`;
+    help = `\`${device.device}\` ${what} in \`${c.state}\`; wait for \`${device.device}.${releasing.state}\` first, e.g. \`state ${wait} { when ${device.device}.${releasing.state} within 2 s else fault ${device.device.toUpperCase()}_NO_STOP -> ${c.state} }\``;
+  } else if (device && c.pos[device.device] === UNKNOWN) {
     const action = homeAction(ir, device.device, device.state);
     help = `the position of \`${device.device}\` is unknown at startup; confirm it first, e.g. \`state Home { ${device.device}.${action} within 2 s else fault HOME_TIMEOUT; -> ${ir.initialState} }\``;
   } else if (device && c.pos[device.device] === MOVING) {
@@ -395,8 +426,7 @@ function deviceStates(e: ExprIR): { device: string; state: string }[] {
 /** The action that puts a device into `state`, for the homing hint. */
 function homeAction(ir: StationIR, device: string, state: string): string {
   const kind = DEVICE_KINDS.get(ir.devices.find((d) => d.name === device)!.kind)!;
-  const sensor = kind.states[state];
-  return Object.keys(kind.actions).find((a) => kind.actions[a]!.done === sensor) ?? Object.keys(kind.actions)[0]!;
+  return Object.keys(kind.actions).find((a) => kind.actions[a]!.done === state) ?? Object.keys(kind.actions)[0]!;
 }
 
 function tooLarge(ir: StationIR, program: A.Program, atoms: string[]): Diagnostic {

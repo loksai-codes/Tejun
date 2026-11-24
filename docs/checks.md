@@ -230,7 +230,7 @@ error[T0101]: undefined name `part_presnt`
 
 ### T0102
 
-**duplicate name.** The same name declared twice, a state named `Stopped`, or a fault named `POSITION_MISMATCH`. Both are built in: handlers go to `Stopped`, and `POSITION_MISMATCH` is raised by the device position check.
+**duplicate name.** The same name declared twice, a state named `Stopped`, or a fault named `POSITION_MISMATCH` or `FEEDBACK_MISMATCH`. These are built in: handlers go to `Stopped`, and the device check raises `POSITION_MISMATCH` (Cylinder) and `FEEDBACK_MISMATCH` (Motor).
 
 From `tests/fixtures/errors/T0102_builtin_stopped.tejun`:
 
@@ -245,7 +245,7 @@ error[T0102]: `Stopped` is a built-in state and cannot be declared
    = 日本語: `Stopped` は組み込みの状態のため宣言できません
 ```
 
-**Fix:** Rename one of them. Never declare `Stopped` or raise `POSITION_MISMATCH` yourself.
+**Fix:** Rename one of them. Never declare `Stopped` or raise a built-in device fault yourself.
 
 ### T0103
 
@@ -405,7 +405,7 @@ error[T0203]: interlock violated: `conveyor` can be ON while `clamp.retracted` i
 
 ### T0204
 
-**fault with no `on fault` handler.** A fault can be raised but nothing handles it. Every station with a device can fault: the built-in position check raises `POSITION_MISMATCH` when a device's sensors disagree with its tracked position.
+**fault with no `on fault` handler.** A fault can be raised but nothing handles it. Every station with a device can fault: the built-in device check raises `POSITION_MISMATCH` (Cylinder) or `FEEDBACK_MISMATCH` (Motor) when a device's sensors disagree with its tracked state.
 
 From `tests/fixtures/errors/T0204_no_fault_handler.tejun`:
 
@@ -687,7 +687,7 @@ error[T0402]: device `clamp` is missing parameter `at_ret`
 13 |   device clamp : Cylinder(extend: clamp_out, retract: clamp_in,
    |          ^^^^^ missing `at_ret`
    |
-   = help: `at_ret` is the sensor that confirms the cylinder is retracted; without it Tejun cannot confirm that a move finished
+   = help: `at_ret` is the sensor that confirms the cylinder is retracted; without it Tejun cannot confirm the device's state
    = 日本語: デバイス `clamp` にパラメータ `at_ret` がありません
 ```
 

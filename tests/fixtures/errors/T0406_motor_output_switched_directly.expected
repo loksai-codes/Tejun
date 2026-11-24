@@ -1,0 +1,8 @@
+error[T0406]: `belt_run` is driven by device `belt`; switching it directly drives it from two places (double coil)
+  --> tests/fixtures/errors/T0406_motor_output_switched_directly.tejun:16:36
+   |
+16 |     state Press  { press_valve on; belt_run on; when not part_at_stop forever -> Feed }
+   |                                    ^^^^^^^^ driven by `belt`
+   |
+   = help: use `belt.run within … else fault …` instead
+   = 日本語: `belt_run` はデバイス `belt` が駆動しています。直接ONにすると2か所から駆動されます (二重コイル)

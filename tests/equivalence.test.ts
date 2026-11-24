@@ -7,14 +7,18 @@
 //     OFF and ON (driven by the simulated machine)
 //   - seeded random inputs, including random sensor values no real machine
 //     would produce
-//   - the device position check: for every device, a sensor stuck ON, a
+//   - the device check: for every cylinder, a sensor stuck ON or OFF, a
 //     sensor failing OFF, the cylinder moved by hand (to the other end and
-//     to mid-stroke), and a glitch shorter than the debounce time
+//     to mid-stroke), and a glitch shorter than the debounce time; for every
+//     motor, its feedback stuck OFF or ON, lost while running, coming on
+//     while stopped, and a short glitch
 
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  POSITION_DEBOUNCE_MS,
+  BUILTIN_FAULTS,
+  FEEDBACK_MISMATCH,
+  MISMATCH_DEBOUNCE_MS,
   POSITION_MISMATCH,
   build,
   type ExprIR,
@@ -100,9 +104,7 @@ describe.each(examples)("%s: simulator and generated ST agree", (file) => {
       expect(compareScan(fb, ir, record.inputs, record.timeMs, record)).toBeUndefined();
     }
     // A sensor stuck ON can stop the machine after one debounce time (6 scans).
-    expect(result.trace.length).toBeGreaterThan(POSITION_DEBOUNCE_MS / SCAN_MS);
-    // A healthy machine never trips the position check.
-    if (jams.length === 0) expect(result.end.fault).not.toBe(POSITION_MISMATCH);
+    expect(result.trace.length).toBeGreaterThan(MISMATCH_DEBOUNCE_MS / SCAN_MS);
   });
 
   // Random sensor values often trip the position check early, so this uses
@@ -155,17 +157,29 @@ function compareTrace(st: string, ir: StationIR, trace: readonly ScanRecord[]): 
 }
 
 /**
- * Whether a `never` / `requires` interlock is violated on the *real* machine:
- * device states come from the simulated cylinders' actual positions, not
- * from the program's tracked positions. Cylinder only (0 = retracted, 1 = extended).
+ * Whether a device state holds on the *real* (simulated) machine:
+ * a cylinder's extension from 0 (retracted) to 1 (extended), or a motor's
+ * speed from 0 (standstill) to 1 (full speed).
  */
-function physicallyViolated(i: InterlockIR, r: ScanRecord, positions: Readonly<Record<string, number>>): boolean {
+function physically(ir: StationIR, device: string, state: string, positions: Readonly<Record<string, number>>): boolean {
+  const kind = ir.devices.find((d) => d.name === device)!.kind;
+  const p = positions[device]!;
+  if (kind === "Cylinder") return state === "extended" ? p >= 1 : p <= 0;
+  return state === "running" ? p >= 1 : p <= 0;
+}
+
+/**
+ * Whether a `never` / `requires` interlock is violated on the real machine:
+ * device states come from the simulated devices, not from the program's
+ * tracked states.
+ */
+function physicallyViolated(ir: StationIR, i: InterlockIR, r: ScanRecord, positions: Readonly<Record<string, number>>): boolean {
   const value = (e: ExprIR): boolean | number => {
     switch (e.kind) {
       case "signal":
         return e.name in r.outputs ? r.outputs[e.name]! : (r.inputs[e.name] ?? false);
       case "device_state":
-        return e.state === "extended" ? positions[e.device]! >= 1 : positions[e.device]! <= 0;
+        return physically(ir, e.device, e.state, positions);
       case "number":
         return e.value;
       case "not":
@@ -202,121 +216,180 @@ function runWith(
     before(sim);
     const positions = sim.plant.positions(); // what the sensors read this scan
     sim.step();
-    if (ir.interlocks.some((i) => physicallyViolated(i, sim.last!, positions))) physical.push(sim.last!.timeMs);
+    if (ir.interlocks.some((i) => physicallyViolated(ir, i, sim.last!, positions))) physical.push(sim.last!.timeMs);
   }
-  // Judged on tracked positions, the proved interlocks always hold, even with
+  // Judged on tracked states, the proved interlocks always hold, even with
   // failed sensors and devices moved by hand.
   expect(sim.events.filter((e) => e.event.kind === "violation")).toEqual([]);
   return { trace: sim.trace, physical };
 }
 
 /**
- * The first time the healthy run has `device` resting at one of its ends for
- * longer than the debounce time (plus margin), so a disturbance there is not
- * masked by the program starting a new move.
+ * The first time the healthy run has `device` tracked in one of `wanted`
+ * for longer than the debounce time (plus margin), so a disturbance there is
+ * not masked by the program starting a new action.
  */
-function restingWindow(ir: StationIR, scenario: Scenario, device: string): { timeMs: number; end: string } | undefined {
-  const ends = Object.keys(ir.devices.find((d) => d.name === device)!.sensors);
-  const needed = POSITION_DEBOUNCE_MS / SCAN_MS + 4;
-  const positions: { timeMs: number; pos: string }[] = [];
-  const healthy = runWith(ir, scenario, (sim) => positions.push({ timeMs: sim.timeMs, pos: sim.station.pos[device]! }));
+function restingWindow(
+  ir: StationIR,
+  scenario: Scenario,
+  device: string,
+  wanted: readonly string[],
+): { timeMs: number; state: string } | undefined {
+  const needed = MISMATCH_DEBOUNCE_MS / SCAN_MS + 4;
+  const tracked: { timeMs: number; state: string }[] = [];
+  const healthy = runWith(ir, scenario, (sim) => tracked.push({ timeMs: sim.timeMs, state: sim.station.pos[device]! }));
   expect(healthy.physical, "a healthy run never violates an interlock on the real machine").toEqual([]);
-  for (let i = 0; i + needed <= positions.length; i++) {
-    const pos = positions[i]!.pos;
-    if (ends.includes(pos) && positions.slice(i, i + needed).every((p) => p.pos === pos)) {
-      return { timeMs: positions[i + 1]!.timeMs, end: pos };
+  for (let i = 0; i + needed <= tracked.length; i++) {
+    const state = tracked[i]!.state;
+    if (wanted.includes(state) && tracked.slice(i, i + needed).every((p) => p.state === state)) {
+      return { timeMs: tracked[i + 1]!.timeMs, state };
     }
   }
   return undefined;
 }
 
-describe.each(examples)("%s: device position check, simulator and generated ST agree", (file) => {
+describe.each(examples)("%s: device check, simulator and generated ST agree", (file) => {
   const { ir, st } = compile(file);
   const scenarioText = readFileSync(new URL(file.replace(".tejun", ".scenario"), examplesDir), "utf8");
   const scenario = parseScenario(scenarioText, ir, new Plant(ir).owned).scenario!;
-  const devices = ir.devices.map((d) => d.name);
-  const sensors = (device: string) => ir.devices.find((d) => d.name === device)!.sensors;
-  const otherEnd = (device: string, end: string) => Object.keys(sensors(device)).find((e) => e !== end)!;
+  const deviceIR = (device: string) => ir.devices.find((d) => d.name === device)!;
+  const cylinders = ir.devices.filter((d) => d.kind === "Cylinder").map((d) => d.name);
+  const motors = ir.devices.filter((d) => d.kind === "Motor").map((d) => d.name);
+  const sensorOf = (device: string, state: string) => deviceIR(device).states[state]!.sensor;
+  const ends = ["extended", "retracted"];
+  const otherEnd = (end: string) => ends.find((e) => e !== end)!;
 
-  /** The first fault is POSITION_MISMATCH, raised in Stopped with every output OFF; returns its time. */
-  function expectMismatch(trace: readonly ScanRecord[]): number {
+  it("never raises a device fault on the healthy scenario", () => {
+    const result = simulate(ir, { scenario, scanMs: SCAN_MS });
+    expect(result.trace.some((r) => r.fault !== undefined && BUILTIN_FAULTS.includes(r.fault))).toBe(false);
+  });
+
+  /** The first fault is `fault`, raised in Stopped with every output OFF; returns its time. */
+  function expectFault(trace: readonly ScanRecord[], fault: string): number {
     const faulted = trace.find((r) => r.fault !== undefined);
-    expect(faulted?.fault).toBe(POSITION_MISMATCH);
+    expect(faulted?.fault).toBe(fault);
     expect(faulted!.state).toBe("Stopped");
     expect(Object.values(faulted!.outputs).every((v) => v === false)).toBe(true);
     return faulted!.timeMs;
   }
 
   /**
-   * Disturb `device` while it rests at an end; expect POSITION_MISMATCH
-   * exactly one debounce time later, and any real-world interlock violation
-   * only between the disturbance and the fault.
+   * Disturb `device` while it rests in one of `wanted`; expect its mismatch
+   * fault exactly one debounce time later, and any real-world interlock
+   * violation only between the disturbance and the fault.
    */
-  function expectCaught(device: string, disturb: (sim: Simulation, end: string) => void): void {
-    const window = restingWindow(ir, scenario, device);
-    expect(window, "the scenario rests the device at an end").toBeDefined();
+  function expectCaught(device: string, wanted: readonly string[], disturb: (sim: Simulation, state: string) => void): void {
+    const window = restingWindow(ir, scenario, device, wanted);
+    expect(window, `the scenario rests ${device} in ${wanted.join(" or ")}`).toBeDefined();
     const { trace, physical } = runWith(ir, scenario, (sim) => {
-      if (sim.timeMs === window!.timeMs) disturb(sim, window!.end);
+      if (sim.timeMs === window!.timeMs) disturb(sim, window!.state);
     });
     expect(compareTrace(st, ir, trace)).toBeUndefined();
-    const faultMs = expectMismatch(trace);
-    expect(faultMs - window!.timeMs).toBe(POSITION_DEBOUNCE_MS);
+    const faultMs = expectFault(trace, deviceIR(device).mismatchFault);
+    expect(faultMs - window!.timeMs).toBe(MISMATCH_DEBOUNCE_MS);
     expect(physical.every((t) => t >= window!.timeMs && t < faultMs), `real violations at ${physical}`).toBe(true);
   }
 
-  it.each(devices)("%s: an end sensor stuck ON is caught once the real machine contradicts it", (device) => {
-    for (const sensor of Object.values(sensors(device))) {
-      // The first scan in which the real sensor would be OFF.
-      let contradicted: number | undefined;
-      const { trace, physical } = runWith(
-        ir,
-        scenario,
-        (sim) => {
-          if (contradicted === undefined && !sim.plant.sensors()[sensor]) contradicted = sim.timeMs;
-        },
-        [{ sensor, value: true }],
-      );
-      expect(compareTrace(st, ir, trace), sensor).toBeUndefined();
-      expect(contradicted, `${sensor}: the scenario moves the device off it`).toBeDefined();
-      // At the latest: the device reaches the other end, then the debounce time.
-      const faultMs = expectMismatch(trace);
-      expect(faultMs - contradicted!, sensor).toBeLessThanOrEqual(DEFAULT_TRAVEL_MS + POSITION_DEBOUNCE_MS);
-      expect(physical.every((t) => t >= contradicted! && t < faultMs), `${sensor}: real violations at ${physical}`).toBe(true);
-    }
-  });
-
-  it.each(devices)("%s: an end sensor stuck OFF from the start gives a timeout, not a mismatch", (device) => {
-    for (const sensor of Object.values(sensors(device))) {
-      const { trace, physical } = runWith(ir, scenario, () => {}, [{ sensor, value: false }]);
-      expect(physical, sensor).toEqual([]);
-      expect(compareTrace(st, ir, trace), sensor).toBeUndefined();
-      expect(trace.some((r) => r.fault === POSITION_MISMATCH), sensor).toBe(false);
-    }
-  });
-
-  it.each(devices)("%s: the sensor of the end it rests at fails OFF", (device) => {
-    expectCaught(device, (sim, end) => sim.setJams([{ sensor: sensors(device)[end]!, value: false }]));
-  });
-
-  it.each(devices)("%s: moved by hand to the other end", (device) => {
-    expectCaught(device, (sim, end) => sim.plant.moveByHand(device, otherEnd(device, end) === "extended" ? 1 : 0));
-  });
-
-  it.each(devices)("%s: moved by hand to mid-stroke", (device) => {
-    expectCaught(device, (sim) => sim.plant.moveByHand(device, 0.5));
-  });
-
-  it.each(devices)("%s: a sensor glitch shorter than the debounce time is ignored", (device) => {
-    const window = restingWindow(ir, scenario, device);
+  /** A glitch shorter than the debounce time on `sensor` while `device` rests in one of `wanted` is ignored. */
+  function expectGlitchIgnored(device: string, wanted: readonly string[], value: boolean): void {
+    const window = restingWindow(ir, scenario, device, wanted);
     expect(window).toBeDefined();
-    const glitchEnd = window!.timeMs + POSITION_DEBOUNCE_MS - 2 * SCAN_MS;
+    const sensor = sensorOf(device, window!.state);
+    const glitchEnd = window!.timeMs + MISMATCH_DEBOUNCE_MS - 2 * SCAN_MS;
     const { trace } = runWith(ir, scenario, (sim) => {
-      if (sim.timeMs === window!.timeMs) sim.setJams([{ sensor: sensors(device)[window!.end]!, value: false }]);
+      if (sim.timeMs === window!.timeMs) sim.setJams([{ sensor, value }]);
       if (sim.timeMs === glitchEnd) sim.setJams([]);
     });
     expect(compareTrace(st, ir, trace)).toBeUndefined();
-    expect(trace.some((r) => r.fault === POSITION_MISMATCH)).toBe(false);
-  });
+    expect(trace.some((r) => r.fault === deviceIR(device).mismatchFault)).toBe(false);
+  }
+
+  // ----- Cylinder -----
+
+  if (cylinders.length > 0) {
+    it.each(cylinders)("cylinder %s: an end sensor stuck ON is caught once the real machine contradicts it", (device) => {
+      for (const end of ends) {
+        const sensor = sensorOf(device, end);
+        // The first scan in which the real sensor would be OFF.
+        let contradicted: number | undefined;
+        const { trace, physical } = runWith(
+          ir,
+          scenario,
+          (sim) => {
+            if (contradicted === undefined && !sim.plant.sensors()[sensor]) contradicted = sim.timeMs;
+          },
+          [{ sensor, value: true }],
+        );
+        expect(compareTrace(st, ir, trace), sensor).toBeUndefined();
+        expect(contradicted, `${sensor}: the scenario moves the device off it`).toBeDefined();
+        // At the latest: the device reaches the other end, then the debounce time.
+        const faultMs = expectFault(trace, POSITION_MISMATCH);
+        expect(faultMs - contradicted!, sensor).toBeLessThanOrEqual(DEFAULT_TRAVEL_MS + MISMATCH_DEBOUNCE_MS);
+        expect(physical.every((t) => t >= contradicted! && t < faultMs), `${sensor}: real violations at ${physical}`).toBe(true);
+      }
+    });
+
+    it.each(cylinders)("cylinder %s: an end sensor stuck OFF from the start gives a timeout, not a mismatch", (device) => {
+      for (const end of ends) {
+        const sensor = sensorOf(device, end);
+        const { trace, physical } = runWith(ir, scenario, () => {}, [{ sensor, value: false }]);
+        expect(compareTrace(st, ir, trace), sensor).toBeUndefined();
+        expect(physical, sensor).toEqual([]);
+        expect(trace.some((r) => r.fault === POSITION_MISMATCH), sensor).toBe(false);
+      }
+    });
+
+    it.each(cylinders)("cylinder %s: the sensor of the end it rests at fails OFF", (device) => {
+      expectCaught(device, ends, (sim, end) => sim.setJams([{ sensor: sensorOf(device, end), value: false }]));
+    });
+
+    it.each(cylinders)("cylinder %s: moved by hand to the other end", (device) => {
+      expectCaught(device, ends, (sim, end) => sim.plant.moveByHand(device, otherEnd(end) === "extended" ? 1 : 0));
+    });
+
+    it.each(cylinders)("cylinder %s: moved by hand to mid-stroke", (device) => {
+      expectCaught(device, ends, (sim) => sim.plant.moveByHand(device, 0.5));
+    });
+
+    it.each(cylinders)("cylinder %s: a sensor glitch shorter than the debounce time is ignored", (device) => {
+      expectGlitchIgnored(device, ends, false);
+    });
+  }
+
+  // ----- Motor -----
+
+  if (motors.length > 0) {
+    it.each(motors)("motor %s: feedback stuck OFF gives the start timeout, not a mismatch", (device) => {
+      const sensor = sensorOf(device, "running");
+      const { trace, physical } = runWith(ir, scenario, () => {}, [{ sensor, value: false }]);
+      expect(compareTrace(st, ir, trace)).toBeUndefined();
+      expect(physical).toEqual([]);
+      const run = ir.states.find((s) => s.step?.kind === "device" && s.step.device === device)!.step!;
+      expect(run.kind === "device" && run.timeout.kind === "within").toBe(true);
+      if (run.kind === "device" && run.timeout.kind === "within") expectFault(trace, run.timeout.fault);
+    });
+
+    it.each(motors)("motor %s: feedback stuck ON never confirms standstill, so nothing that requires it runs", (device) => {
+      const sensor = sensorOf(device, "running");
+      const { trace, physical } = runWith(ir, scenario, () => {}, [{ sensor, value: true }]);
+      expect(compareTrace(st, ir, trace)).toBeUndefined();
+      // The motor is never tracked stopped, so an interlock requiring it holds on the real machine too.
+      expect(physical).toEqual([]);
+      expect(trace.some((r) => r.fault === FEEDBACK_MISMATCH)).toBe(false);
+    });
+
+    it.each(motors)("motor %s: feedback lost while running", (device) => {
+      expectCaught(device, ["running"], (sim) => sim.setJams([{ sensor: sensorOf(device, "running"), value: false }]));
+    });
+
+    it.each(motors)("motor %s: feedback comes on while stopped (started by itself, or a welded contactor)", (device) => {
+      expectCaught(device, ["stopped"], (sim) => sim.setJams([{ sensor: sensorOf(device, "running"), value: true }]));
+    });
+
+    it.each(motors)("motor %s: a feedback glitch while running, shorter than the debounce time, is ignored", (device) => {
+      expectGlitchIgnored(device, ["running"], false);
+    });
+  }
 });
 
 describe("ST interpreter self-check", () => {

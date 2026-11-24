@@ -174,7 +174,7 @@ report.japanese = await status();
 await shot("5-japanese");
 
 // other-examples: load each and run it.
-for (const id of ["conveyor_sorter", "pick_place"]) {
+for (const id of ["conveyor_sorter", "pick_place", "press_station"]) {
   await evaluate(`(() => {
     const select = [...document.querySelectorAll("select")].find(s => [...s.options].some(o => o.value === ${JSON.stringify(id)}));
     const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set;
@@ -212,6 +212,7 @@ const checks = [
   ["a jammed sensor causes CLAMP_TIMEOUT", /CLAMP_TIMEOUT/.test(report.afterJam?.state ?? "")],
   ["Japanese interface", /状態/.test(report.japanese?.state ?? "")],
   ["other examples run without errors", report.conveyor_sorter?.errors === "0" && report.pick_place?.errors === "0"],
+  ["press station (Motor + Cylinder) runs without errors or faults", report.press_station?.errors === "0" && !/MISMATCH|TIMEOUT|NO_START|NO_STOP|NO_FORCE|OVERLOAD/.test(report.press_station?.state ?? "")],
   ["no horizontal scroll at phone width", report.scrollWidth?.[0] <= report.scrollWidth?.[1]],
   ["no console errors or warnings", problems.length === 0],
 ];

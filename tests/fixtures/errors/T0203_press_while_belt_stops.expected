@@ -1,0 +1,10 @@
+error[T0203]: interlock violated: `press_valve` can be ON while `belt.stopped` is false
+  --> tests/fixtures/errors/T0203_press_while_belt_stops.tejun:16:20
+   |
+16 |     state Press  { press_valve on; when not part_at_stop forever -> Feed }
+   |                    ^^^^^^^^^^^^^^ `press_valve` is ON here in `Press`
+   |
+   = path: Feed -> Press
+   = interlock: `interlock press_valve requires belt.stopped` (line 12)
+   = help: `belt` may still be stopping in `Press`; wait for `belt.stopped` first, e.g. `state WaitBelt { when belt.stopped within 2 s else fault BELT_NO_STOP -> Press }`
+   = 日本語: インターロック違反: `belt.stopped` が偽のときに `press_valve` がONになる可能性があります

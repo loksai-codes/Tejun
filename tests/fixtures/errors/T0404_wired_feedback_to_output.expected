@@ -1,0 +1,8 @@
+error[T0404]: parameter `feedback` needs a bool input, but `press_valve` is an output
+  --> tests/fixtures/errors/T0404_wired_feedback_to_output.tejun:10:48
+   |
+10 |   device belt : Motor(run: belt_run, feedback: press_valve)
+   |                                                ^^^^^^^^^^^ expected a bool input
+   |
+   = help: `feedback` is the running feedback: ON while the motor runs, OFF at standstill
+   = 日本語: パラメータ `feedback` には bool 型の入力が必要ですが、`press_valve` は出力です

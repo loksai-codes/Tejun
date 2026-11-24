@@ -16,8 +16,16 @@
 // State, fault and position numbers are plain integers with comments, the
 // most portable form across ST compilers.
 
-import { DEVICE_KINDS } from "../device-kinds.js";
-import { formatExpr as tejun, outputsOn, type ExprIR, type StateIR, type StationIR, type TransitionIR } from "../ir.js";
+import {
+  departedStates,
+  formatExpr as tejun,
+  outputsOn,
+  type DeviceIR,
+  type ExprIR,
+  type StateIR,
+  type StationIR,
+  type TransitionIR,
+} from "../ir.js";
 import { VERSION } from "../version.js";
 
 const STOPPED = 0;
@@ -41,7 +49,7 @@ class Generator {
   private indent = 0;
   private readonly stateNo = new Map<string, number>();
   private readonly faultNo = new Map<string, number>();
-  /** Device name -> position name -> number. */
+  /** Device name -> tracked state name (including a release's `via`) -> number. */
   private readonly posNo = new Map<string, Map<string, number>>();
 
   constructor(ir: StationIR, options: StOptions) {
@@ -51,7 +59,7 @@ class Generator {
     ir.states.forEach((s, i) => this.stateNo.set(s.name, i + 1));
     ir.faults.forEach((f, i) => this.faultNo.set(f, i + 1));
     for (const d of ir.devices) {
-      const states = Object.keys(DEVICE_KINDS.get(d.kind)!.states);
+      const states = [...Object.keys(d.states), ...(d.release ? [d.release.via] : [])];
       this.posNo.set(d.name, new Map(states.map((s, i) => [s, i + 2])));
     }
   }
@@ -76,9 +84,11 @@ class Generator {
     this.line("");
     this.line(`   States (tj_state):  ${[...this.stateNo].map(([n, i]) => `${i} ${n}`).join(", ")}`);
     this.line(`   Faults (tj_fault):  0 none${ir.faults.map((f, i) => `, ${i + 1} ${f}`).join("")}`);
-    for (const [device, positions] of this.posNo) {
+    for (const d of ir.devices) {
+      const positions = this.posNo.get(d.name)!;
       const list = [`${POS_UNKNOWN} unknown`, `${POS_MOVING} moving`, ...[...positions].map(([p, i]) => `${i} ${p}`)];
-      this.line(`   Positions (tj_pos_${device}):  ${list.join(", ")}`);
+      const title = d.tracked === "position" ? "Positions" : "States";
+      this.line(`   ${title} (tj_pos_${d.name}):  ${list.join(", ")}`);
     }
     this.line("*)");
     this.line("");
@@ -113,12 +123,14 @@ class Generator {
         this.line("tj_timer : TON;");
         for (const d of ir.devices) {
           const moving = initial.step?.kind === "device" && initial.step.device === d.name;
-          this.line(`tj_pos_${d.name} : INT := ${moving ? POS_MOVING : POS_UNKNOWN}; (* ${d.name} position *)`);
+          this.line(`tj_pos_${d.name} : INT := ${moving ? POS_MOVING : POS_UNKNOWN}; (* ${d.name} ${d.tracked} *)`);
         }
-        if (ir.positionCheck) {
+        if (ir.deviceCheck) {
           for (const d of ir.devices) {
-            this.line(`tj_from_${d.name} : INT := ${POS_UNKNOWN}; (* ${d.name} position when its current move started *)`);
-            this.line(`tj_mismatch_${d.name} : TON; (* ${d.name} sensors disagree with its position *)`);
+            if (hasDepartures(d)) {
+              this.line(`tj_from_${d.name} : INT := ${POS_UNKNOWN}; (* ${d.name} ${d.tracked} when its current move started *)`);
+            }
+            this.line(`tj_mismatch_${d.name} : TON; (* ${d.name} sensors disagree with its ${d.tracked} *)`);
           }
         }
       });
@@ -142,6 +154,7 @@ class Generator {
     this.line("(* ---- Runtime monitors and E-stop: checked every scan ---- *)");
     this.line(`IF tj_state <> ${STOPPED} THEN`);
     this.block(() => {
+      this.releases();
       for (const i of ir.interlocks) {
         if (i.kind !== "condition") continue;
         this.line(`(* interlock ${comment(tejun(i.condition))} else fault ${i.fault} *)`);
@@ -149,7 +162,7 @@ class Generator {
         this.block(() => this.line(`tj_fault := ${this.faultNo.get(i.fault)}; (* ${i.fault} *)`));
         this.line("END_IF;");
       }
-      this.positionCheck();
+      this.deviceCheck();
       for (const h of ir.handlers.conditions) {
         this.line(`(* on ${comment(tejun(h.condition))} *)`);
         this.line(`IF ${this.expr(h.condition)} THEN`);
@@ -162,26 +175,50 @@ class Generator {
   }
 
   /**
-   * Per device, a mismatch is any of: two end sensors ON at once; the device
-   * is tracked at an end whose sensor is OFF; or it is moving away from an
-   * end whose sensor is still ON. Lasting `debounceMs` raises the fault. The
-   * timer runs every scan outside Stopped.
+   * A device that acts only while driven (Motor) and is `unknown` or in its
+   * release's `via` state reaches the release state once its sensor confirms
+   * it. Runs first in the scan, so the rest of the scan sees it.
    */
-  private positionCheck(): void {
-    const check = this.ir.positionCheck;
+  private releases(): void {
+    for (const d of this.ir.devices) {
+      if (!d.release) continue;
+      const no = (s: string) => this.posNo.get(d.name)!.get(s)!;
+      const { via, state } = d.release;
+      this.line(`(* ${d.name}: ${state} once ${comment(holds(d, state))} *)`);
+      this.line(`IF (tj_pos_${d.name} = ${POS_UNKNOWN} OR tj_pos_${d.name} = ${no(via)}) AND ${holds(d, state)} THEN`);
+      this.block(() => this.line(`tj_pos_${d.name} := ${no(state)}; (* ${state} *)`));
+      this.line("END_IF;");
+    }
+  }
+
+  /**
+   * Per device, a mismatch is any of: two states confirmed by different
+   * sensors both hold (a cylinder's two end sensors ON); the device is tracked
+   * in a state its sensor contradicts (an end sensor OFF, a running motor's
+   * feedback OFF, a stopped motor's feedback ON); or it is moving away from a
+   * state that still holds (a cylinder's start sensor still ON). Lasting
+   * `debounceMs` raises the device's mismatch fault. The timer runs every
+   * scan outside Stopped.
+   */
+  private deviceCheck(): void {
+    const check = this.ir.deviceCheck;
     if (!check) return;
     for (const d of this.ir.devices) {
-      const ends = Object.entries(d.sensors);
+      const states = Object.keys(d.states);
+      const no = (s: string) => this.posNo.get(d.name)!.get(s)!;
       const terms: string[] = [];
-      for (let i = 0; i < ends.length; i++) {
-        for (let j = i + 1; j < ends.length; j++) terms.push(`(${ends[i]![1]} AND ${ends[j]![1]})`);
+      for (let i = 0; i < states.length; i++) {
+        for (let j = i + 1; j < states.length; j++) {
+          const [a, b] = [states[i]!, states[j]!];
+          if (d.states[a]!.sensor !== d.states[b]!.sensor) terms.push(`(${holds(d, a)} AND ${holds(d, b)})`);
+        }
       }
-      const no = (pos: string) => this.posNo.get(d.name)!.get(pos)!;
-      for (const [pos, sensor] of ends) terms.push(`(tj_pos_${d.name} = ${no(pos)} AND NOT ${sensor})`);
-      for (const [pos, sensor] of ends) {
-        terms.push(`(tj_pos_${d.name} = ${POS_MOVING} AND tj_from_${d.name} = ${no(pos)} AND ${sensor})`);
+      for (const s of states) terms.push(`(tj_pos_${d.name} = ${no(s)} AND ${contradicts(d, s)})`);
+      for (const s of departedStates(d)) {
+        terms.push(`(tj_pos_${d.name} = ${POS_MOVING} AND tj_from_${d.name} = ${no(s)} AND ${holds(d, s)})`);
       }
-      this.line(`(* position check: ${d.name} sensors must agree with its tracked position *)`);
+      const fault = d.mismatchFault;
+      this.line(`(* ${d.tracked} check: ${d.name} sensors must agree with its tracked ${d.tracked} *)`);
       this.line(`tj_mismatch_${d.name}(`);
       this.block(() => {
         this.line(`IN := ${terms[0]}`);
@@ -189,7 +226,7 @@ class Generator {
         this.line(`PT := ${time(check.debounceMs)});`);
       });
       this.line(`IF tj_fault = 0 AND tj_mismatch_${d.name}.Q THEN`);
-      this.block(() => this.line(`tj_fault := ${this.faultNo.get(check.fault)}; (* ${check.fault} *)`));
+      this.block(() => this.line(`tj_fault := ${this.faultNo.get(fault)}; (* ${fault} *)`));
       this.line("END_IF;");
     }
   }
@@ -231,8 +268,7 @@ class Generator {
       this.line(`IF ${step.done} THEN`);
       this.block(() => {
         this.stepDone();
-        const pos = this.positionAfter(step.device, step.action);
-        this.line(`tj_pos_${step.device} := ${this.posNo.get(step.device)!.get(pos)}; (* ${pos} *)`);
+        this.line(`tj_pos_${step.device} := ${this.posNo.get(step.device)!.get(step.target)}; (* ${step.target} *)`);
       });
       if (step.timeout.kind === "within") {
         const fault = step.timeout.fault;
@@ -290,24 +326,43 @@ class Generator {
       this.line("tj_step_done := FALSE;");
       this.line("tj_timer(IN := FALSE);");
       const moving = this.ir.states.filter((s) => s.step?.kind === "device");
-      if (moving.length === 0) return;
-      this.line("CASE tj_state OF");
-      this.block(() => {
-        for (const s of moving) {
-          if (s.step?.kind !== "device") continue;
-          const d = s.step.device;
-          if (this.ir.positionCheck) {
-            this.line(`${this.stateNo.get(s.name)}: (* ${s.name}: ${d} moving *)`);
-            this.block(() => {
-              this.line(`tj_from_${d} := tj_pos_${d};`);
-              this.line(`tj_pos_${d} := ${POS_MOVING};`);
-            });
-          } else {
-            this.line(`${this.stateNo.get(s.name)}: tj_pos_${d} := ${POS_MOVING}; (* ${s.name}: ${d} moving *)`);
+      if (moving.length > 0) {
+        this.line("CASE tj_state OF");
+        this.block(() => {
+          for (const s of moving) {
+            const step = s.step;
+            if (step?.kind !== "device") continue;
+            const d = this.ir.devices.find((x) => x.name === step.device)!;
+            if (this.ir.deviceCheck && hasDepartures(d)) {
+              this.line(`${this.stateNo.get(s.name)}: (* ${s.name}: ${d.name} moving *)`);
+              this.block(() => {
+                this.line(`tj_from_${d.name} := tj_pos_${d.name};`);
+                this.line(`tj_pos_${d.name} := ${POS_MOVING};`);
+              });
+            } else {
+              this.line(`${this.stateNo.get(s.name)}: tj_pos_${d.name} := ${POS_MOVING}; (* ${s.name}: ${d.name} moving *)`);
+            }
           }
-        }
-      });
-      this.line("END_CASE;");
+        });
+        this.line("END_CASE;");
+      }
+      // A device that acts only while driven is released by every state
+      // that does not drive it, including Stopped.
+      for (const d of this.ir.devices) {
+        if (!d.release) continue;
+        const { via, state } = d.release;
+        const no = (s: string) => this.posNo.get(d.name)!.get(s)!;
+        const driving = this.ir.states.filter((s) => s.step?.kind === "device" && s.step.device === d.name);
+        const active = [POS_MOVING, ...Object.keys(d.states).filter((s) => s !== state).map(no)];
+        const conds = [
+          ...driving.map((s) => `tj_state <> ${this.stateNo.get(s.name)}`),
+          `(${active.map((n) => `tj_pos_${d.name} = ${n}`).join(" OR ")})`,
+        ];
+        this.line(`(* ${d.name} is ${via} in every state that does not drive it *)`);
+        this.line(`IF ${conds.join(" AND ")} THEN`);
+        this.block(() => this.line(`tj_pos_${d.name} := ${no(via)}; (* ${via} *)`));
+        this.line("END_IF;");
+      }
     });
     this.line("END_IF;");
   }
@@ -385,12 +440,6 @@ class Generator {
     this.line(`tj_state := ${this.stateNo.get(target)}; (* ${target} *)`);
   }
 
-  private positionAfter(device: string, action: string): string {
-    const kind = DEVICE_KINDS.get(this.ir.devices.find((d) => d.name === device)!.kind)!;
-    const done = kind.actions[action]!.done;
-    return Object.keys(kind.states).find((s) => kind.states[s] === done)!;
-  }
-
   private signalComment(name: string, withAddress = true): string {
     const s = this.ir.signals.find((x) => x.name === name)!;
     const parts = [
@@ -448,6 +497,22 @@ function real(v: number): string {
   if (Number.isInteger(v)) return `${v}.0`;
   const s = String(v);
   return s.includes("e") ? v.toExponential(6).replace("e", "E") : s;
+}
+
+/** ST for "device state `s` holds by its sensor", e.g. `belt_fb` or `NOT belt_fb`. */
+function holds(d: DeviceIR, s: string): string {
+  const { sensor, value } = d.states[s]!;
+  return value ? sensor : `NOT ${sensor}`;
+}
+
+/** ST for "the sensor contradicts device state `s`". */
+function contradicts(d: DeviceIR, s: string): string {
+  const { sensor, value } = d.states[s]!;
+  return value ? `NOT ${sensor}` : sensor;
+}
+
+function hasDepartures(d: DeviceIR): boolean {
+  return departedStates(d).length > 0;
 }
 
 function time(ms: number): string {

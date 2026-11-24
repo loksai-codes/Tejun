@@ -1,0 +1,8 @@
+error[T0402]: device `belt` is missing parameter `feedback`
+  --> tests/fixtures/errors/T0402_motor_missing_feedback.tejun:10:10
+   |
+10 |   device belt : Motor(run: belt_run)
+   |          ^^^^ missing `feedback`
+   |
+   = help: `feedback` is the running feedback: ON while the motor runs, OFF at standstill; without it Tejun cannot confirm the device's state
+   = 日本語: デバイス `belt` にパラメータ `feedback` がありません

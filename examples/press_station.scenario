@@ -1,0 +1,10 @@
+# Press station: one part arrives on the belt, is clamped and pressed, and is
+# carried out; the belt then runs on to bring the next part.
+# A part reaches the stop 1.5 s after the belt starts moving.
+follow part_at_stop = belt_run after 1.5 s
+# The pressed part passes the exit sensor 0.8 s after Eject starts.
+follow exit_eye = done_lamp after 800 ms
+# The load cell reads the pressing force while the ram is down.
+at 2.5 s   press_force = 45 kN
+at 3 s     press_force = 0 kN
+until 4.5 s

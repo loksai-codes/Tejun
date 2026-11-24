@@ -1,0 +1,20 @@
+// T0404: a Motor's feedback wired to an output.
+station Belt "ベルト" {
+  io {
+    input  part_at_stop : bool @ %IX0.0 "ワーク検出"
+    input  belt_fb      : bool @ %IX0.1 "ベルト回転検出"
+    input  estop_ok     : bool @ %IX0.7 "非常停止OK" safety
+    output belt_run     : bool @ %QX0.0 "ベルト運転"
+    output press_valve  : bool @ %QX0.1 "プレス弁"
+  }
+  device belt : Motor(run: belt_run, feedback: press_valve)
+  interlock press_valve requires belt.stopped
+  sequence main {
+    state Feed   { belt.run within 1 s else fault BELT_NO_START;
+                   when part_at_stop within 10 s else fault FEED_TIMEOUT -> Settle }
+    state Settle { when belt.stopped within 2 s else fault BELT_NO_STOP -> Press }
+    state Press  { press_valve on; when not part_at_stop forever -> Feed }
+  }
+  on fault        { outputs safe; -> Stopped }
+  on not estop_ok { outputs safe; -> Stopped }
+}
