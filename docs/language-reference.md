@@ -119,6 +119,24 @@ parameter (T0406). A cylinder offers:
 A device owns its outputs: switching `clamp_out on` directly is a double coil
 and is rejected (T0406).
 
+### Position check
+
+Tejun tracks each device's position from its confirmed actions (see
+[Interlocks](#interlocks)). At runtime, every scan, it also checks that the
+sensors agree with that tracked position. A device's sensors disagree when:
+
+- both end sensors are ON at once;
+- it is tracked at an end (`extended` or `retracted`) and that end's sensor is OFF,
+  for example because it was pushed by hand or the sensor failed;
+- it is moving away from an end and that end's sensor is still ON, for example
+  because the sensor is stuck ON.
+
+If a disagreement lasts 100 ms (the debounce time, fixed for now), the built-in
+fault `POSITION_MISMATCH` is raised: `on fault` runs and every output goes OFF in
+`Stopped`. So every station with a device needs `on fault` (T0204), and a program
+may not raise `POSITION_MISMATCH` itself (T0102). What this check covers, and what
+it cannot, is in [Model assumptions](model-assumptions.md).
+
 ## Interlocks
 
 | Form | Meaning | Checked |
@@ -203,7 +221,8 @@ on not estop_ok { outputs safe; -> Stopped }
 
 - `on not <safety input>` is required in every station (T0205). It is checked
   every scan, before the sequence.
-- `on fault` is required if anything can raise a fault (T0204).
+- `on fault` is required if anything can raise a fault (T0204): a timeout, a
+  runtime monitor, or a device (the [position check](#position-check)).
 - Both must go to `Stopped` (T0209); the body is always `outputs safe; -> Stopped`.
 - Safety inputs may be used in handlers and interlocks, but not in states (T0305),
   so the stop path stays independent of the sequence.
@@ -227,9 +246,10 @@ true/false (T0103); `<` and friends compare numbers with the same unit (T0104);
 The generated PLC code, the simulator and the interlock proof all follow the same
 order every scan:
 
-1. runtime monitors (`<cond> else fault`) and E-stop handlers
+1. runtime monitors (`<cond> else fault`), the device position check, and
+   E-stop handlers
 2. the current state: its step, or once the step is done its transitions
-3. entering a new state resets its step and timer
+3. entering a new state resets its step and timer, and marks a device moving
 4. every output is written once, from the state the scan ended in
 
 ## Tools

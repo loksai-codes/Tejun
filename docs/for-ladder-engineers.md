@@ -84,7 +84,7 @@ The full list is in [`checks.md`](checks.md).
 Every scan does the same four things, in the same order, as the simulator and the
 proof:
 
-1. Check the runtime monitors and the E-stop.
+1. Check the runtime monitors, the cylinder position check and the E-stop.
 2. Run the current step: wait for its sensor or timer, then try its transitions.
 3. On entering a new step, reset its timer.
 4. Write every output once, from the current step.
@@ -100,6 +100,13 @@ conveyor := (tj_state = 2); (* Idle *)
 
 `tj_state` (current step) and `tj_fault` (alarm number) are outputs of the
 function block, so an HMI can show them.
+
+Every cylinder also gets the position-abnormal alarm you would normally write by
+hand (シリンダ位置異常). If its sensors disagree with where the program last
+confirmed it for 100 ms, the station stops with `POSITION_MISMATCH`. That covers
+both sensors ON, the confirmed end's sensor going OFF (pushed by hand, sensor
+failed), and the start sensor staying ON after the valve switched. Details and
+limits: [Model assumptions](model-assumptions.md).
 
 ## Things to know
 

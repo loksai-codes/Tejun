@@ -3,7 +3,7 @@
 **A small language for programming one factory machine station, whose compiler
 catches the bugs that break machines before the code runs.** You describe the
 station's sensors, cylinders and outputs, the interlocks between them, and the
-sequence of steps. Tejun proves the interlocks can never be violated, rejects
+sequence of steps. Tejun proves the program can never violate the interlocks, rejects
 waits with no timeout, dead-end steps, I/O and unit mistakes, and makes double
 coils impossible to write. Then it generates IEC 61131-3 Structured Text that
 compiles with matiec, OpenPLC's compiler ([logs](docs/plc-verification.md)), and
@@ -95,6 +95,17 @@ error[T0203]: interlock violated: `conveyor` can be ON while `clamp.retracted` i
    = 日本語: インターロック違反: `clamp.retracted` が偽のときに `conveyor` がONになる可能性があります
 ```
 
+**What is proven vs what is guarded at runtime.** The proof covers every possible
+sequence of input values, so a lying sensor cannot make the program break an
+interlock. But it reasons about each cylinder's *tracked* position (the end its
+last action confirmed), not where the cylinder physically is. Closing that gap is
+a runtime job: every scan, the generated code checks each cylinder's sensors
+against its tracked position. If they disagree for 100 ms (pushed by hand, a
+sensor stuck ON or OFF), it raises `POSITION_MISMATCH` and switches every output
+off. Timeouts, `else fault` monitors and the E-stop handler are runtime guards
+too. [Model assumptions](docs/model-assumptions.md) lists exactly what is proved,
+what is guarded, and the cases neither can catch.
+
 ## How it works
 
 ```mermaid
@@ -130,6 +141,7 @@ flowchart LR
 - [Language reference](docs/language-reference.md) — every construct, with examples
 - [Diagnostic codes](docs/checks.md) — every error, with real output and the fix
 - [Tejun for ladder engineers](docs/for-ladder-engineers.md) — ラダー技術者のための Tejun
+- [Model assumptions](docs/model-assumptions.md) — what the proof guarantees, and what is guarded at runtime
 - [PLC verification](docs/plc-verification.md) — the generated ST compiled with matiec, with logs
 - [Grammar](docs/grammar.ebnf)
 

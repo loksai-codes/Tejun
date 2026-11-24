@@ -17,6 +17,12 @@ Phase 7 docs done (`BUILD_PROMPTS.md` has the phase plan).
   shared a `VAR` block (fixed; regression test in `tests/st.test.ts`). CI job `plc-compile`
   runs it on every push (not yet run: no remote). Details and logs: `docs/plc-verification.md`.
   Not verified: running inside OpenPLC Runtime; CODESYS / Sysmac Studio / GX Works3.
+- Position check (2026-11-24): built-in fault `POSITION_MISMATCH` (last fault number) for
+  every station with a device; generated ST and simulator agree scan by scan, including
+  sensors stuck ON/OFF and cylinders moved by hand (`Plant.moveByHand`). No new error code:
+  T0102 reserves the name, T0204 requires `on fault` when a station has a device.
+  `docs/model-assumptions.md` says what is proved vs guarded, and the known blind spots
+  (e.g. homing onto a stuck-ON sensor; fixed 100 ms debounce).
 - Phase 5: `packages/runtime` (IR interpreter, simulated machine, scenarios, timeline);
   `tejun run`; each example has a `.scenario`; equivalence test proves the simulator
   matches the generated ST scan by scan.
@@ -109,6 +115,13 @@ Rules agreed in Phase 3 (enforced by the checker):
 - Address clashes are exact duplicates only (`%IW0` vs `%IX0.x` overlap differs between tools).
 - Cylinder: actions `extend`/`retract`, states `extended`/`retracted`, all four
   parameters required. Definitions live in `device-kinds.ts`.
+- Position check (`device-kinds.ts`: `POSITION_MISMATCH`, `POSITION_DEBOUNCE_MS` = 100):
+  per device, mismatch = both end sensors ON, or tracked at an end whose sensor is OFF,
+  or moving away from an end (`tj_from_<device>`) whose sensor is still ON. Debounced by
+  one TON per device (`tj_mismatch_<device>`), checked in the monitor block after
+  `else fault` monitors and before E-stop handlers. It only stops the machine, so the
+  proof does not model it (E-stop already allows "stop in any scan"). The IR carries it
+  (`StationIR.positionCheck`, `DeviceIR.sensors`); codegen and runtime both read it.
 - Signal and station names must be usable in Structured Text: no ST reserved words,
   no `tj_` prefix (reserved for generated code), no names differing only in case (T0107).
 
